@@ -22,6 +22,12 @@ import PermanentDrawer from './PermanentDrawer';
 import ThreeJsCanvas from './threeJs/Canvas';
 import useFile from './threeJs/useFile';
 
+type GhostOverlay = {
+  pixelsPerWorldUnit: number;
+  x: number;
+  y: number;
+};
+
 export type Settings = {
   workingColor?: string;
   mode?: Mode;
@@ -51,12 +57,19 @@ export default function Editor({ onSettingsChange }: Props) {
   const [imageCanvas, setImageCanvas] = React.useState<HTMLCanvasElement | null>(
     null
   );
+  const [imageFile, setImageFile] = React.useState<File | null>(null);
   const [imageName, setImageName] = React.useState<string>();
   const [imageSize, setImageSize] = React.useState(30);
   const [imageRotation, setImageRotation] = React.useState(0);
+  const [imagePreviewUrl, setImagePreviewUrl] = React.useState<string | null>(
+    null
+  );
   const [textValue, setTextValue] = React.useState('Text');
   const [textSize, setTextSize] = React.useState(24);
   const [textRotation, setTextRotation] = React.useState(0);
+  const [ghostOverlay, setGhostOverlay] = React.useState<GhostOverlay | null>(
+    null
+  );
   const [, setSceneRevision] = React.useState(0);
   const editorRef = React.useRef<HTMLDivElement>(null);
 
@@ -68,6 +81,26 @@ export default function Editor({ onSettingsChange }: Props) {
       });
     }
   }, [mode, workingColor]);
+
+  useEffect(() => {
+    if (!imageFile) {
+      setImagePreviewUrl(null);
+      return;
+    }
+
+    const previewUrl = URL.createObjectURL(imageFile);
+    setImagePreviewUrl(previewUrl);
+
+    return () => {
+      URL.revokeObjectURL(previewUrl);
+    };
+  }, [imageFile]);
+
+  useEffect(() => {
+    if (mode !== 'image') {
+      setGhostOverlay(null);
+    }
+  }, [mode]);
 
   const handleSelect = (e: ThreeEvent<MouseEvent>) => {
     if (mode === 'mesh') {
@@ -229,10 +262,35 @@ export default function Editor({ onSettingsChange }: Props) {
     try {
       const canvas = await createImageCanvas(file);
       setImageCanvas(canvas);
+      setImageFile(file);
       setImageName(file.name);
     } catch (error) {
       enqueueSnackbar(error.toString(), { variant: 'error' });
     }
+  };
+
+  const handlePointerMoveModel = (e: ThreeEvent<PointerEvent>) => {
+    if (mode !== 'image' || !imageCanvas || !editorRef.current) {
+      return;
+    }
+
+    const bounds = editorRef.current.getBoundingClientRect();
+    const pixelsPerWorldUnit = getPixelsPerWorldUnit(
+      e.camera as THREE.Camera,
+      e.point,
+      bounds.height
+    );
+    const pointerPosition = getPointerClientPosition(e, bounds);
+
+    if (!pointerPosition) {
+      return;
+    }
+
+    setGhostOverlay({
+      x: pointerPosition.x,
+      y: pointerPosition.y,
+      pixelsPerWorldUnit,
+    });
   };
 
   const handlePointerOverModel = () => {
@@ -250,7 +308,20 @@ export default function Editor({ onSettingsChange }: Props) {
     if (editorRef.current) {
       editorRef.current.style.cursor = 'auto';
     }
+
+    setGhostOverlay(null);
   };
+
+  const imageGhostStyle =
+    mode === 'image' && imageCanvas && imagePreviewUrl && ghostOverlay && object
+      ? getImageGhostStyle({
+          imageCanvas,
+          imageSize,
+          imageRotation,
+          object,
+          ghostOverlay,
+        })
+      : null;
 
   return (
     <PermanentDrawer title={title}>
@@ -290,6 +361,31 @@ export default function Editor({ onSettingsChange }: Props) {
           textRotation={textRotation}
           textSize={textSize}
         />
+        {imageGhostStyle && (
+          <Box
+            component="img"
+            alt="Image ghost preview"
+            src={imagePreviewUrl!}
+            sx={{
+              position: 'fixed',
+              left: imageGhostStyle.left,
+              top: imageGhostStyle.top,
+              width: imageGhostStyle.width,
+              height: imageGhostStyle.height,
+              transform: `translate(-50%, -50%) rotate(${imageRotation}deg)`,
+              transformOrigin: 'center center',
+              opacity: 0.45,
+              pointerEvents: 'none',
+              zIndex: 3,
+              border: '1px dashed rgba(33, 150, 243, 0.7)',
+              borderRadius: 0.5,
+              backgroundColor: 'rgba(255, 255, 255, 0.08)',
+              boxShadow: '0 6px 18px rgba(0, 0, 0, 0.18)',
+              objectFit: 'contain',
+              filter: 'saturate(1.05)',
+            }}
+          />
+        )}
         {object && (
           <div style={{ height: '100%' }} ref={editorRef}>
             <ThreeJsCanvas
@@ -300,6 +396,7 @@ export default function Editor({ onSettingsChange }: Props) {
               }
               geometry={object}
               onSelect={handleSelect}
+              onPointerMoveModel={handlePointerMoveModel}
               onPointerOverModel={handlePointerOverModel}
               onPointerOutModel={handlePointerOutModel}
             />
@@ -308,4 +405,92 @@ export default function Editor({ onSettingsChange }: Props) {
       </Box>
     </PermanentDrawer>
   );
+}
+
+function getPixelsPerWorldUnit(
+  camera: THREE.Camera,
+  pointWorld: THREE.Vector3,
+  viewportHeightPx: number
+) {
+  if (camera instanceof THREE.PerspectiveCamera) {
+    const distance = camera.position.distanceTo(pointWorld);
+    const visibleHeight =
+      2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * distance;
+
+    if (visibleHeight <= 0) {
+      return 1;
+    }
+
+    return (viewportHeightPx / visibleHeight) * camera.zoom;
+  }
+
+  if (camera instanceof THREE.OrthographicCamera) {
+    const visibleHeight = (camera.top - camera.bottom) / camera.zoom;
+
+    if (visibleHeight <= 0) {
+      return 1;
+    }
+
+    return viewportHeightPx / visibleHeight;
+  }
+
+  return 1;
+}
+
+function getImageGhostStyle({
+  imageCanvas,
+  imageSize,
+  imageRotation,
+  object,
+  ghostOverlay,
+}: {
+  ghostOverlay: GhostOverlay;
+  imageCanvas: HTMLCanvasElement;
+  imageRotation: number;
+  imageSize: number;
+  object: THREE.Object3D;
+}) {
+  const aspect = imageCanvas.width / imageCanvas.height || 1;
+  const widthLocal = aspect >= 1 ? imageSize : imageSize * aspect;
+  const heightLocal = aspect >= 1 ? imageSize / aspect : imageSize;
+  const worldScale = object.getWorldScale(new THREE.Vector3());
+  const scaleFactor = Math.max(worldScale.x, worldScale.y, worldScale.z);
+  const width = widthLocal * scaleFactor * ghostOverlay.pixelsPerWorldUnit;
+  const height = heightLocal * scaleFactor * ghostOverlay.pixelsPerWorldUnit;
+
+  return {
+    left: ghostOverlay.x,
+    top: ghostOverlay.y,
+    width: `${Math.max(width, 18)}px`,
+    height: `${Math.max(height, 18)}px`,
+    rotation: imageRotation,
+  };
+}
+
+function getPointerClientPosition(
+  e: ThreeEvent<PointerEvent>,
+  bounds: DOMRect
+) {
+  if (e.nativeEvent) {
+    return {
+      x: e.nativeEvent.clientX,
+      y: e.nativeEvent.clientY,
+    };
+  }
+
+  if (typeof e.clientX === 'number' && typeof e.clientY === 'number') {
+    return {
+      x: e.clientX,
+      y: e.clientY,
+    };
+  }
+
+  if (e.pointer) {
+    return {
+      x: bounds.left + ((e.pointer.x + 1) / 2) * bounds.width,
+      y: bounds.top + ((1 - e.pointer.y) / 2) * bounds.height,
+    };
+  }
+
+  return null;
 }

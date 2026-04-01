@@ -10,6 +10,7 @@ type Props = JSX.IntrinsicElements['group'] & {
   continuousPaint?: boolean;
   geometry: THREE.Object3D;
   onSelect: (e) => void;
+  onPointerMoveModel?: (e) => void;
   onPointerOverModel: (e) => void;
   onPointerOutModel: (e) => void;
 };
@@ -18,6 +19,7 @@ export default function ThreeJsCanvas({
   continuousPaint = true,
   geometry,
   onSelect,
+  onPointerMoveModel,
   onPointerOverModel,
   onPointerOutModel,
 }: Props) {
@@ -64,6 +66,10 @@ export default function ThreeJsCanvas({
   const handlePointerMove = (e) => {
     e.stopPropagation();
 
+    if (e.object) {
+      onPointerMoveModel?.(e);
+    }
+
     if (mouseIsDown) {
       if (e.buttons === 0) {
         // TODO It happens sometimes that camera control is tried to be attached, but it is already attached
@@ -97,7 +103,6 @@ export default function ThreeJsCanvas({
         far: 1000,
         position: [6, 6, 6],
       }}
-      onMouseMove={handlePointerMove}
       frameloop="demand"
     >
       <CameraControls ref={cameraControlRef} />
