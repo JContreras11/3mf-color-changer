@@ -1,6 +1,12 @@
 import * as THREE from 'three';
 
+import {
+  getRasterOverlayDimensions,
+  getRasterOverlayPlacement,
+} from './rasterOverlayPlacement';
+
 type Props = {
+  camera?: THREE.Camera;
   root: THREE.Object3D;
   targetMesh: THREE.Mesh;
   pointWorld: THREE.Vector3;
@@ -11,12 +17,12 @@ type Props = {
   name?: string;
 };
 
-const MIN_OFFSET = 0.05;
 const ALPHA_THRESHOLD = 24;
 const MAX_SEGMENTS = 96;
 const MIN_SEGMENTS = 12;
 
 export default function applyRasterOverlay({
+  camera,
   root,
   targetMesh,
   pointWorld,
@@ -26,18 +32,13 @@ export default function applyRasterOverlay({
   rotationDegrees = 0,
   name,
 }: Props) {
-  root.updateMatrixWorld(true);
-  targetMesh.updateMatrixWorld(true);
-
-  const normalWorld = getWorldNormal(targetMesh, face);
-  const pointRoot = root.worldToLocal(pointWorld.clone());
-  const normalRoot = worldDirectionToLocal(root, normalWorld);
-  const tangentRoot = getFaceTangent(root, targetMesh, face, normalRoot);
-  const bitangentRoot = new THREE.Vector3()
-    .crossVectors(normalRoot, tangentRoot)
-    .normalize();
-
-  const geometry = createOverlayGeometry(canvas, size);
+  const dimensions = getRasterOverlayDimensions(canvas, size);
+  const geometry = createOverlayGeometry(
+    canvas,
+    dimensions.width,
+    dimensions.height,
+    dimensions.aspect
+  );
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
   texture.needsUpdate = true;
@@ -54,19 +55,20 @@ export default function applyRasterOverlay({
   });
 
   const mesh = new THREE.Mesh(geometry, material);
+  const placement = getRasterOverlayPlacement({
+    camera,
+    face,
+    height: dimensions.height,
+    pointWorld,
+    root,
+    rotationDegrees,
+    targetMesh,
+    width: dimensions.width,
+  });
+
   mesh.name = name || 'Overlay';
-  mesh.position.copy(
-    pointRoot.add(normalRoot.clone().multiplyScalar(Math.max(size * 0.002, MIN_OFFSET)))
-  );
-
-  const basis = new THREE.Matrix4().makeBasis(
-    tangentRoot,
-    bitangentRoot,
-    normalRoot
-  );
-
-  mesh.quaternion.setFromRotationMatrix(basis);
-  mesh.rotateZ(THREE.MathUtils.degToRad(rotationDegrees));
+  mesh.position.copy(placement.positionRoot);
+  mesh.quaternion.copy(placement.quaternionRoot);
   mesh.renderOrder = 10;
   mesh.castShadow = false;
   mesh.receiveShadow = false;
@@ -79,12 +81,12 @@ export default function applyRasterOverlay({
   return mesh;
 }
 
-function createOverlayGeometry(canvas: HTMLCanvasElement, size: number) {
-  const aspect = canvas.width / canvas.height || 1;
-  const maxDimension = Math.max(size, 0.1);
-  const width = aspect >= 1 ? maxDimension : maxDimension * aspect;
-  const height = aspect >= 1 ? maxDimension / aspect : maxDimension;
-
+function createOverlayGeometry(
+  canvas: HTMLCanvasElement,
+  width: number,
+  height: number,
+  aspect: number
+) {
   const cols =
     aspect >= 1
       ? MAX_SEGMENTS
@@ -207,59 +209,4 @@ function getRasterData(
   context.drawImage(canvas, 0, 0, width, height);
 
   return context.getImageData(0, 0, width, height).data;
-}
-
-function getWorldNormal(mesh: THREE.Mesh, face: THREE.Face) {
-  return face.normal
-    .clone()
-    .transformDirection(mesh.matrixWorld)
-    .normalize();
-}
-
-function worldDirectionToLocal(root: THREE.Object3D, directionWorld: THREE.Vector3) {
-  const originRoot = root.worldToLocal(new THREE.Vector3(0, 0, 0));
-  const targetRoot = root.worldToLocal(directionWorld.clone());
-
-  return targetRoot.sub(originRoot).normalize();
-}
-
-function getFaceTangent(
-  root: THREE.Object3D,
-  mesh: THREE.Mesh,
-  face: THREE.Face,
-  normalRoot: THREE.Vector3
-) {
-  const positions = mesh.geometry.attributes.position;
-  const meshToRoot = new THREE.Matrix4()
-    .copy(root.matrixWorld)
-    .invert()
-    .multiply(mesh.matrixWorld);
-
-  const v1 = new THREE.Vector3()
-    .fromBufferAttribute(positions, face.a)
-    .applyMatrix4(meshToRoot);
-  const v2 = new THREE.Vector3()
-    .fromBufferAttribute(positions, face.b)
-    .applyMatrix4(meshToRoot);
-  const v3 = new THREE.Vector3()
-    .fromBufferAttribute(positions, face.c)
-    .applyMatrix4(meshToRoot);
-
-  const edges = [
-    new THREE.Vector3().subVectors(v2, v1),
-    new THREE.Vector3().subVectors(v3, v2),
-    new THREE.Vector3().subVectors(v1, v3),
-  ].sort((a, b) => b.lengthSq() - a.lengthSq());
-
-  const tangent = edges[0].clone().projectOnPlane(normalRoot).normalize();
-
-  if (tangent.lengthSq() > 0) {
-    return tangent;
-  }
-
-  const fallback = Math.abs(normalRoot.y) < 0.99
-    ? new THREE.Vector3(0, 1, 0)
-    : new THREE.Vector3(1, 0, 0);
-
-  return new THREE.Vector3().crossVectors(fallback, normalRoot).normalize();
 }
