@@ -1,5 +1,7 @@
 import * as THREE from 'three';
 
+import getSurfaceNormalWorld from './getSurfaceNormalWorld';
+
 const MIN_OFFSET = 0.05;
 const EPSILON = 1e-8;
 const BASE_ROTATION_DEGREES = 180;
@@ -61,7 +63,7 @@ export function getRasterOverlayPlacement({
   root.updateMatrixWorld(true);
   targetMesh.updateMatrixWorld(true);
 
-  const normalWorld = getWorldNormal(targetMesh, face);
+  const normalWorld = getSurfaceNormalWorld(targetMesh, face, pointWorld);
   const pointRoot = root.worldToLocal(pointWorld.clone());
   const normalRoot = worldDirectionToLocal(root, normalWorld);
   const tangentRoot =
@@ -142,13 +144,6 @@ function getOverlayCornersRoot({
   return localCorners.map((corner) =>
     corner.clone().applyQuaternion(quaternionRoot).add(positionRoot)
   ) as RasterOverlayPlacement['cornersRoot'];
-}
-
-function getWorldNormal(mesh: THREE.Mesh, face: THREE.Face) {
-  return face.normal
-    .clone()
-    .transformDirection(mesh.matrixWorld)
-    .normalize();
 }
 
 function worldDirectionToLocal(

@@ -331,49 +331,81 @@ function buildSolidOverlayGeometry(
   geometry: THREE.BufferGeometry,
   thickness: number
 ) {
-  const source = geometry.index ? geometry.toNonIndexed() : geometry.clone();
+  const source = geometry.clone();
+  source.computeVertexNormals();
   const positions = source.getAttribute('position');
-  const colors = source.getAttribute('color');
-  const extrusion = new THREE.Vector3(0, 0, -Math.max(thickness, 0.01));
-  const outputPositions: number[] = [];
-  const outputColors: number[] = [];
+  const normals = source.getAttribute('normal');
+  const uvs = source.getAttribute('uv');
+  const colorAttribute = source.getAttribute('color');
+  const vertexCount = positions.count;
+  const depth = Math.max(thickness, 0.01);
+  const outputPositions = new Float32Array(vertexCount * 2 * 3);
+  const outputUvs = uvs ? new Float32Array(vertexCount * 2 * 2) : null;
+  const outputColors = colorAttribute
+    ? new Float32Array(vertexCount * 2 * 3)
+    : null;
+  const sourceIndex =
+    source.getIndex() ||
+    new THREE.BufferAttribute(
+      Uint32Array.from({ length: vertexCount }, (_, index) => index),
+      1
+    );
+  const outputIndices: number[] = [];
   const edges = new Map<string, BoundaryEdge>();
 
-  for (let triangleIndex = 0; triangleIndex < positions.count; triangleIndex += 3) {
-    const frontVertices = [0, 1, 2].map((offset) =>
-      new THREE.Vector3().fromBufferAttribute(positions, triangleIndex + offset)
-    ) as [THREE.Vector3, THREE.Vector3, THREE.Vector3];
-    const frontColors = [0, 1, 2].map((offset) =>
-      getVertexColorTuple(colors, triangleIndex + offset)
-    ) as [ColorTuple, ColorTuple, ColorTuple];
-    const backVertices = frontVertices.map((vertex) =>
-      vertex.clone().add(extrusion)
-    ) as [THREE.Vector3, THREE.Vector3, THREE.Vector3];
+  for (let vertexIndex = 0; vertexIndex < vertexCount; vertexIndex += 1) {
+    const position = new THREE.Vector3().fromBufferAttribute(positions, vertexIndex);
+    const normal = new THREE.Vector3()
+      .fromBufferAttribute(normals, vertexIndex)
+      .normalize();
+    const backPosition = position.clone().add(normal.multiplyScalar(-depth));
+    const frontOffset = vertexIndex * 3;
+    const backOffset = (vertexIndex + vertexCount) * 3;
 
-    pushColoredTriangle(
-      outputPositions,
-      outputColors,
-      frontVertices[0],
-      frontVertices[1],
-      frontVertices[2],
-      frontColors[0],
-      frontColors[1],
-      frontColors[2]
-    );
-    pushColoredTriangle(
-      outputPositions,
-      outputColors,
-      backVertices[0],
-      backVertices[2],
-      backVertices[1],
-      frontColors[0],
-      frontColors[2],
-      frontColors[1]
-    );
+    outputPositions[frontOffset] = position.x;
+    outputPositions[frontOffset + 1] = position.y;
+    outputPositions[frontOffset + 2] = position.z;
+    outputPositions[backOffset] = backPosition.x;
+    outputPositions[backOffset + 1] = backPosition.y;
+    outputPositions[backOffset + 2] = backPosition.z;
 
-    registerBoundaryEdge(edges, frontVertices[0], frontVertices[1], frontColors[0], frontColors[1]);
-    registerBoundaryEdge(edges, frontVertices[1], frontVertices[2], frontColors[1], frontColors[2]);
-    registerBoundaryEdge(edges, frontVertices[2], frontVertices[0], frontColors[2], frontColors[0]);
+    if (outputUvs) {
+      const frontUvOffset = vertexIndex * 2;
+      const backUvOffset = (vertexIndex + vertexCount) * 2;
+      const u = uvs.getX(vertexIndex);
+      const v = uvs.getY(vertexIndex);
+
+      outputUvs[frontUvOffset] = u;
+      outputUvs[frontUvOffset + 1] = v;
+      outputUvs[backUvOffset] = u;
+      outputUvs[backUvOffset + 1] = v;
+    }
+
+    if (outputColors) {
+      const frontColorOffset = vertexIndex * 3;
+      const backColorOffset = (vertexIndex + vertexCount) * 3;
+      const color = getVertexColorTuple(colorAttribute, vertexIndex);
+
+      outputColors[frontColorOffset] = color[0];
+      outputColors[frontColorOffset + 1] = color[1];
+      outputColors[frontColorOffset + 2] = color[2];
+      outputColors[backColorOffset] = color[0];
+      outputColors[backColorOffset + 1] = color[1];
+      outputColors[backColorOffset + 2] = color[2];
+    }
+  }
+
+  for (let triangleIndex = 0; triangleIndex < sourceIndex.count; triangleIndex += 3) {
+    const a = sourceIndex.getX(triangleIndex);
+    const b = sourceIndex.getX(triangleIndex + 1);
+    const c = sourceIndex.getX(triangleIndex + 2);
+
+    outputIndices.push(a, b, c);
+    outputIndices.push(a + vertexCount, c + vertexCount, b + vertexCount);
+
+    registerBoundaryEdge(edges, a, b);
+    registerBoundaryEdge(edges, b, c);
+    registerBoundaryEdge(edges, c, a);
   }
 
   edges.forEach((edge) => {
@@ -381,70 +413,39 @@ function buildSolidOverlayGeometry(
       return;
     }
 
-    const backStart = edge.start.clone().add(extrusion);
-    const backEnd = edge.end.clone().add(extrusion);
-
-    pushColoredTriangle(
-      outputPositions,
-      outputColors,
+    outputIndices.push(
       edge.start,
-      backEnd,
+      edge.end + vertexCount,
       edge.end,
-      edge.startColor,
-      edge.endColor,
-      edge.endColor
-    );
-    pushColoredTriangle(
-      outputPositions,
-      outputColors,
       edge.start,
-      backStart,
-      backEnd,
-      edge.startColor,
-      edge.startColor,
-      edge.endColor
+      edge.start + vertexCount,
+      edge.end + vertexCount
     );
   });
 
   const solidGeometry = new THREE.BufferGeometry();
-  solidGeometry.setAttribute(
-    'position',
-    new THREE.Float32BufferAttribute(outputPositions, 3)
-  );
-  solidGeometry.setAttribute(
-    'color',
-    new THREE.Float32BufferAttribute(outputColors, 3)
-  );
+  solidGeometry.setAttribute('position', new THREE.BufferAttribute(outputPositions, 3));
+
+  if (outputUvs) {
+    solidGeometry.setAttribute('uv', new THREE.BufferAttribute(outputUvs, 2));
+  }
+
+  if (outputColors) {
+    solidGeometry.setAttribute('color', new THREE.BufferAttribute(outputColors, 3));
+  }
+
+  solidGeometry.setIndex(outputIndices);
   solidGeometry.computeVertexNormals();
 
   return solidGeometry;
 }
 
-function pushColoredTriangle(
-  outputPositions: number[],
-  outputColors: number[],
-  v1: THREE.Vector3,
-  v2: THREE.Vector3,
-  v3: THREE.Vector3,
-  c1: ColorTuple,
-  c2: ColorTuple,
-  c3: ColorTuple
-) {
-  outputPositions.push(v1.x, v1.y, v1.z, v2.x, v2.y, v2.z, v3.x, v3.y, v3.z);
-  outputColors.push(...c1, ...c2, ...c3);
-}
-
 function registerBoundaryEdge(
   edges: Map<string, BoundaryEdge>,
-  start: THREE.Vector3,
-  end: THREE.Vector3,
-  startColor: ColorTuple,
-  endColor: ColorTuple
+  start: number,
+  end: number
 ) {
-  const startKey = getVertexKey(start);
-  const endKey = getVertexKey(end);
-  const key =
-    startKey < endKey ? `${startKey}|${endKey}` : `${endKey}|${startKey}`;
+  const key = start < end ? `${start}|${end}` : `${end}|${start}`;
   const existing = edges.get(key);
 
   if (existing) {
@@ -454,10 +455,8 @@ function registerBoundaryEdge(
 
   edges.set(key, {
     count: 1,
-    end: end.clone(),
-    endColor,
-    start: start.clone(),
-    startColor,
+    end,
+    start,
   });
 }
 
@@ -517,10 +516,8 @@ function escapeXml(value: string) {
 
 type BoundaryEdge = {
   count: number;
-  end: THREE.Vector3;
-  endColor: ColorTuple;
-  start: THREE.Vector3;
-  startColor: ColorTuple;
+  end: number;
+  start: number;
 };
 
 type ColorTuple = [number, number, number];
