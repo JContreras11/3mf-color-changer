@@ -10,7 +10,8 @@
     "prettier": "prettier . --write",
     "serve": "node build.mjs --serve --watch",
     "test": "echo \"Error: no test specified\" && exit 1",
-    "watch": "node build.mjs --watch"
+    "watch": "node build.mjs --watch",
+    "postinstall": "patch-package"
   },
   "license": "UNLICENSED",
   "devDependencies": {
@@ -22,6 +23,7 @@
     "esbuild-plugin-replace": "^1.4.0",
     "eslint": "^8.56.0",
     "eslint-plugin-react": "^7.34.3",
+    "patch-package": "^8.0.1",
     "prettier": "^3.2.4",
     "typescript": "5.3.3"
   },

@@ -8,9 +8,16 @@ export default function getFace(
   const normal = new THREE.Vector3();
   const position = mesh.geometry.attributes.position;
 
-  const a = faceIndex * 3;
-  const b = faceIndex * 3 + 1;
-  const c = faceIndex * 3 + 2;
+  let a = faceIndex * 3;
+  let b = faceIndex * 3 + 1;
+  let c = faceIndex * 3 + 2;
+
+  const index = mesh.geometry.index;
+  if (index) {
+    a = index.getX(faceIndex * 3);
+    b = index.getX(faceIndex * 3 + 1);
+    c = index.getX(faceIndex * 3 + 2);
+  }
 
   triangle.setFromAttributeAndIndices(position, a, b, c);
   triangle.getNormal(normal);

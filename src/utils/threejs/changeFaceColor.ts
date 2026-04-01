@@ -1,7 +1,5 @@
 import * as THREE from 'three';
 
-import { getFaceCount } from './getFaceCount';
-
 export default function changeFaceColor(
   mesh: THREE.Mesh,
   color: string,
@@ -10,11 +8,11 @@ export default function changeFaceColor(
   const threeColor = new THREE.Color(color);
 
   if (!mesh.geometry.attributes.color) {
-    const facesCount = getFaceCount(mesh);
+    const vertexCount = mesh.geometry.attributes.position.count;
     const filledArray: number[] = [];
     const currentColor = new THREE.Color(0xffffff);
 
-    for (let i = 0; i < facesCount; ++i) {
+    for (let i = 0; i < vertexCount; ++i) {
       filledArray.push(currentColor.r, currentColor.g, currentColor.b);
     }
 

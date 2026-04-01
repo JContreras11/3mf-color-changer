@@ -15,7 +15,6 @@ export default function readFromFile(
         const contents = event.target.result as ArrayBuffer;
         const loader = new ThreeMFLoader();
         const object = loader.parse(contents);
-
         resolve(object);
       });
 

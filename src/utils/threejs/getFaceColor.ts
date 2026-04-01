@@ -10,8 +10,8 @@ export default function getFaceColor(
 
   const threeColor = new THREE.Color(
     mesh.geometry.attributes.color.getX(face.a),
-    mesh.geometry.attributes.color.getY(face.b),
-    mesh.geometry.attributes.color.getZ(face.b)
+    mesh.geometry.attributes.color.getY(face.a),
+    mesh.geometry.attributes.color.getZ(face.a)
   );
 
   return `#${threeColor.getHexString()}`;

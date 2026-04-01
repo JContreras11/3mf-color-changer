@@ -3,18 +3,30 @@ export function addColorGroup(
   colors: string[],
   colorGroupId?: string
 ) {
-  const colorGroup = xmlDoc.createElement('m:colorgroup');
+  const MATERIAL_NS = 'http://schemas.microsoft.com/3dmanufacturing/material/2015/02';
+  const colorGroup = xmlDoc.createElementNS(MATERIAL_NS, 'm:colorgroup');
 
   colorGroupId = colorGroupId || findNextFreeId(xmlDoc).toString();
   colorGroup.setAttribute('id', colorGroupId);
 
   for (let i = 0; i < colors.length; i++) {
-    const color = xmlDoc.createElement('m:color', {});
+    const color = xmlDoc.createElementNS(MATERIAL_NS, 'm:color');
     color.setAttribute('color', colors[i]);
     colorGroup.appendChild(color);
   }
 
-  xmlDoc.getElementsByTagName('resources')[0].appendChild(colorGroup);
+  let resourcesNode = xmlDoc.getElementsByTagName('resources')[0];
+  if (!resourcesNode) {
+    resourcesNode = xmlDoc.createElementNS('http://schemas.microsoft.com/3dmanufacturing/core/2015/02', 'resources');
+    const modelNode = xmlDoc.getElementsByTagName('model')[0];
+    if (modelNode) {
+      modelNode.appendChild(resourcesNode);
+    } else {
+      xmlDoc.documentElement.appendChild(resourcesNode);
+    }
+  }
+
+  resourcesNode.appendChild(colorGroup);
 
   return colorGroupId;
 }

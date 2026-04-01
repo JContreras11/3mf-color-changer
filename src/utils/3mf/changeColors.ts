@@ -6,9 +6,11 @@ import {
   ZipReader,
   ZipWriter,
 } from '@zip.js/zip.js';
+import * as THREE from 'three';
 
 import getFace from '../threejs/getFace';
 import getFaceColor from '../threejs/getFaceColor';
+import { getFaceCount } from '../threejs/getFaceCount';
 import { addColorGroup } from './addColorGroup';
 
 export type Face = {
@@ -28,13 +30,14 @@ export async function changeColors(
   const zipWriter = new ZipWriter(zipFileWriter);
   const zipReader = new ZipReader(zipFileReader);
   const entries = await zipReader.getEntries();
-  let nextId = 100; // TODO
+  // Use a high starting ID to prevent collisions with existing resource IDs in the 3MF XML
+  let nextId = 1000000;
 
   // Loop through all entries and add them to the new zip file. If the entry is the
   // 3dmodel.model file, we will change the colors.
   for (const entry of entries) {
-    // If it's not the 3dmodel.model file, we just add it to the new zip file
-    if (!entry.filename.endsWith('3dmodel.model')) {
+    // We process all .model files because 3MF objects might be stored in separate model files (e.g. 3D/Objects/A.model)
+    if (!entry.filename.toLowerCase().endsWith('.model')) {
       const writer = new BlobWriter();
       const data = await entry.getData!(writer);
       await zipWriter.add(entry.filename, new BlobReader(data));
@@ -60,31 +63,45 @@ export async function changeColors(
           );
       }
 
-      object.traverse((child) => {
+      object.traverse((child: THREE.Object3D) => {
         const mesh = child as THREE.Mesh;
 
         if (!mesh.isMesh) {
           return;
         }
-        const geometry = mesh.geometry;
-        const attributes = geometry.attributes;
 
         // Find the object in the 3MF file that matches the mesh
-        const obj = findObjectByName(xmlDoc, mesh.name);
+        const xmlId = getXmlId(mesh);
+        let obj: Element | null = null;
+        
+        if (xmlId) {
+          obj = xmlDoc.querySelector(`object[id="${xmlId}"]`);
+        }
+        
+        if (!obj) {
+          obj = findObjectByName(xmlDoc, mesh.name);
+        }
 
         if (obj) {
           const triangles = Array.from(obj.getElementsByTagName('triangle'));
+          const lookup = new TriangleLookup(obj);
           const colorGroup: string[] = [];
 
           // Get the color of the mesh
-          if (mesh.material.color) {
-            colorGroup.push(`#${mesh.material.color.getHexString()}`);
+          if ((mesh.material as THREE.MeshStandardMaterial).color) {
+            colorGroup.push(`#${(mesh.material as THREE.MeshStandardMaterial).color.getHexString()}`);
           }
 
           // Go through all faces
-          for (let i = 0; i < attributes.position.count / 3; ++i) {
+          let faceMismatch = false;
+          for (let i = 0; i < getFaceCount(mesh) / 3; ++i) {
             const face = getFace(mesh, i);
-            const triangleIdx = findTriangleIndex(obj, face);
+            const triangleIdx = lookup.find(face);
+
+            if (triangleIdx === -1) {
+              faceMismatch = true;
+              break; // This mesh does not match this XML object (e.g. fallback selected wrong object)
+            }
 
             // Find the color of the face
             const color = getFaceColor(mesh, face);
@@ -102,9 +119,13 @@ export async function changeColors(
             );
           }
 
+          if (faceMismatch) {
+            return; // Skip altering this object if it doesn't match the current mesh
+          }
+
           // It seems that in some cases, setting the color on the model is necessary. Otherwise
           // the color of the faces is not applied to the object. I don't know why this is the case.
-          obj.setAttribute('pid', '100');
+          obj.setAttribute('pid', nextId.toString());
           obj.setAttribute('pindex', '0');
 
           addColorGroup(xmlDoc, colorGroup, nextId.toString());
@@ -131,6 +152,16 @@ export async function changeColors(
   return zipFileWriter.getData();
 }
 
+function getXmlId(object: THREE.Object3D): string | undefined {
+  if (object.userData && object.userData.xmlId) {
+    return object.userData.xmlId;
+  }
+  if (object.parent) {
+    return getXmlId(object.parent);
+  }
+  return undefined;
+}
+
 function findObjectByName(xmlDoc: Document, name: string): Element | null {
   const object = xmlDoc.querySelector(`object[name="${name}"]`);
 
@@ -139,78 +170,109 @@ function findObjectByName(xmlDoc: Document, name: string): Element | null {
   // modify.
   if (!object) {
     const objects = xmlDoc.querySelectorAll('object');
-    if (objects.length === 1) {
+    // Ensure we only fallback if there's exactly 1 object AND it is actually a mesh object (not a component)
+    if (objects.length === 1 && objects[0].querySelector('mesh')) {
       return objects[0];
     }
+    // If not found by name, try to find one that has the same triangle count roughly but we'll just check all mesh ones later... 
+    // Fallback: we return null if we can't be sure! Actually, let's return all mesh objects and let the vertex check sort it out.
+    // However, function signature is Element | null. So we'll stick to null if multiple.
   }
 
   return object;
 }
 
-function findTriangleIndex(mesh: Element, face: Face): number {
-  // I have vertices in the 3MF file, and I have coordinates from ThreeJS.
-  // The coordinates in the 3MF file can have different precision then the ones
-  // from ThreeJS. So I need to find the vertex in the 3MF file that matches the
-  // coordinates from ThreeJS. I do this by looping through all vertices and
-  // comparing the coordinates. I get all vertices for the face and can find the index
-  // of the triangle in the list.
-  const vertices = Array.from(mesh.getElementsByTagName('vertex'));
-  const triangles = Array.from(mesh.getElementsByTagName('triangle'));
-  const multiple = {
-    v1: [] as number[],
-    v2: [] as number[],
-    v3: [] as number[],
-  };
+class TriangleLookup {
+  private triangleIndexMap: Map<string, number>;
+  private vertexGrid: Map<string, number[]>;
+  private vertexCoords: { x: number; y: number; z: number }[];
 
-  const check = (x: number, y: number, z: number, face) => {
-    return (
-      Math.abs(x - face.x) < 0.01 &&
-      Math.abs(y - face.y) < 0.01 &&
-      Math.abs(z - face.z) < 0.01
-    );
-  };
+  constructor(mesh: Element) {
+    this.vertexGrid = new Map();
+    this.triangleIndexMap = new Map();
+    this.vertexCoords = [];
 
-  // Loop through all vertices
-  for (let i = 0; i < vertices.length; ++i) {
-    const vertex = vertices[i];
+    const vertices = mesh.getElementsByTagName('vertex');
+    for (let i = 0; i < vertices.length; ++i) {
+      const vertex = vertices[i];
+      const x = parseFloat(vertex.getAttribute('x')!);
+      const y = parseFloat(vertex.getAttribute('y')!);
+      const z = parseFloat(vertex.getAttribute('z')!);
 
-    const x = parseFloat(vertex.getAttribute('x')!);
-    const y = parseFloat(vertex.getAttribute('y')!);
-    const z = parseFloat(vertex.getAttribute('z')!);
+      this.vertexCoords.push({ x, y, z });
 
-    // Check if the coordinates match
-    if (check(x, y, z, face.v1)) {
-      multiple.v1.push(i);
+      const hash = this.hash(x, y, z);
+      if (!this.vertexGrid.has(hash)) {
+        this.vertexGrid.set(hash, []);
+      }
+      this.vertexGrid.get(hash)!.push(i);
     }
-    if (check(x, y, z, face.v2)) {
-      multiple.v2.push(i);
-    }
-    if (check(x, y, z, face.v3)) {
-      multiple.v3.push(i);
+
+    const triangles = mesh.getElementsByTagName('triangle');
+    for (let i = 0; i < triangles.length; ++i) {
+      const t = triangles[i];
+      const v1 = t.getAttribute('v1');
+      const v2 = t.getAttribute('v2');
+      const v3 = t.getAttribute('v3');
+      this.triangleIndexMap.set(`${v1}_${v2}_${v3}`, i);
     }
   }
 
-  let found;
+  private hash(x: number, y: number, z: number): string {
+    return `${Math.round(x / 0.05)}_${Math.round(y / 0.05)}_${Math.round(z / 0.05)}`;
+  }
 
-  for (const v1 of multiple.v1) {
-    for (const v2 of multiple.v2) {
-      for (const v3 of multiple.v3) {
-        if (found) {
-          break;
+  private getNeighbors(x: number, y: number, z: number): string[] {
+    const hx = Math.round(x / 0.05);
+    const hy = Math.round(y / 0.05);
+    const hz = Math.round(z / 0.05);
+    const hashes = [];
+    for (let dx = -1; dx <= 1; dx++) {
+      for (let dy = -1; dy <= 1; dy++) {
+        for (let dz = -1; dz <= 1; dz++) {
+          hashes.push(`${hx + dx}_${hy + dy}_${hz + dz}`);
         }
-
-        found = mesh.querySelector(
-          `triangle[v1="${v1}"][v2="${v2}"][v3="${v3}"]`
-        );
       }
     }
+    return hashes;
   }
 
-  if (!found) {
-    throw new Error(
-      'Could not determine correct triangle for coloring during 3MF modification'
-    );
+  private findMatchingVertices(x: number, y: number, z: number): number[] {
+    const hashes = this.getNeighbors(x, y, z);
+    const matches: number[] = [];
+    const used = new Set<number>();
+
+    for (const hash of hashes) {
+      const candidates = this.vertexGrid.get(hash) || [];
+      for (const i of candidates) {
+        if (used.has(i)) continue;
+        used.add(i);
+        const v = this.vertexCoords[i];
+        if (
+          Math.abs(v.x - x) < 0.01 &&
+          Math.abs(v.y - y) < 0.01 &&
+          Math.abs(v.z - z) < 0.01
+        ) {
+          matches.push(i);
+        }
+      }
+    }
+    return matches;
   }
 
-  return triangles.indexOf(found!);
+  find(face: Face): number {
+    const c1 = this.findMatchingVertices(face.v1.x, face.v1.y, face.v1.z);
+    const c2 = this.findMatchingVertices(face.v2.x, face.v2.y, face.v2.z);
+    const c3 = this.findMatchingVertices(face.v3.x, face.v3.y, face.v3.z);
+
+    for (const v1 of c1) {
+      for (const v2 of c2) {
+        for (const v3 of c3) {
+          const idx = this.triangleIndexMap.get(`${v1}_${v2}_${v3}`);
+          if (idx !== undefined) return idx;
+        }
+      }
+    }
+    return -1;
+  }
 }
