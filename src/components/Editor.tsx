@@ -1,4 +1,5 @@
 import Box from '@mui/material/Box';
+import { enqueueSnackbar } from 'notistack';
 import { ThreeEvent } from '@react-three/fiber';
 import React, { useEffect } from 'react';
 import { useLoaderData, useLocation } from 'react-router-dom';
@@ -6,13 +7,17 @@ import * as THREE from 'three';
 
 import config from '../etc/config.json';
 import exportFileJob from '../jobs/exportFile';
+import applyRasterOverlay from '../utils/threejs/applyRasterOverlay';
 import changeFaceColor from '../utils/threejs/changeFaceColor';
 import changeMeshColor from '../utils/threejs/changeMeshColor';
+import createImageCanvas from '../utils/threejs/createImageCanvas';
+import createTextCanvas from '../utils/threejs/createTextCanvas';
 import getFace from '../utils/threejs/getFace';
 import getFaceColor from '../utils/threejs/getFaceColor';
 import sameVector3 from '../utils/threejs/sameVector3';
 import { useJobContext } from './JobProvider';
 import ModeSelector, { Mode } from './ModeSelector';
+import OverlayBrushPanel from './OverlayBrushPanel';
 import PermanentDrawer from './PermanentDrawer';
 import ThreeJsCanvas from './threeJs/Canvas';
 import useFile from './threeJs/useFile';
@@ -43,6 +48,16 @@ export default function Editor({ onSettingsChange }: Props) {
   const [workingColor, setWorkingColor] = React.useState<string>(
     settings?.workingColor || '#f00'
   );
+  const [imageCanvas, setImageCanvas] = React.useState<HTMLCanvasElement | null>(
+    null
+  );
+  const [imageName, setImageName] = React.useState<string>();
+  const [imageSize, setImageSize] = React.useState(30);
+  const [imageRotation, setImageRotation] = React.useState(0);
+  const [textValue, setTextValue] = React.useState('Text');
+  const [textSize, setTextSize] = React.useState(24);
+  const [textRotation, setTextRotation] = React.useState(0);
+  const [, setSceneRevision] = React.useState(0);
   const editorRef = React.useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -63,6 +78,10 @@ export default function Editor({ onSettingsChange }: Props) {
       handleFaceNeighborColorChange(e, workingColor);
     } else if (mode === 'select_color' && e.face) {
       setWorkingColor(getFaceColor(e.object as THREE.Mesh, e.face));
+    } else if (mode === 'image') {
+      handleImageOverlay(e);
+    } else if (mode === 'text') {
+      handleTextOverlay(e);
     }
   };
 
@@ -135,8 +154,85 @@ export default function Editor({ onSettingsChange }: Props) {
     setWorkingColor(color);
   };
 
+  const forceCanvasRender = () => {
+    setSceneRevision((prev) => prev + 1);
+  };
+
+  const handleImageOverlay = (e: ThreeEvent<MouseEvent>) => {
+    if (!imageCanvas) {
+      enqueueSnackbar('Select an image before placing it on the model.', {
+        variant: 'warning',
+      });
+      return;
+    }
+
+    if (!e.face || !object) {
+      return;
+    }
+
+    const mesh = e.object as THREE.Mesh;
+
+    if (mesh.userData.excludeFromPainting) {
+      return;
+    }
+
+    applyRasterOverlay({
+      root: object,
+      targetMesh: mesh,
+      pointWorld: e.point.clone(),
+      face: e.face,
+      canvas: imageCanvas,
+      size: imageSize,
+      rotationDegrees: imageRotation,
+      name: imageName || 'Image overlay',
+    });
+
+    forceCanvasRender();
+  };
+
+  const handleTextOverlay = (e: ThreeEvent<MouseEvent>) => {
+    if (!e.face || !object) {
+      return;
+    }
+
+    const mesh = e.object as THREE.Mesh;
+
+    if (mesh.userData.excludeFromPainting) {
+      return;
+    }
+
+    try {
+      const canvas = createTextCanvas(textValue, workingColor);
+
+      applyRasterOverlay({
+        root: object,
+        targetMesh: mesh,
+        pointWorld: e.point.clone(),
+        face: e.face,
+        canvas,
+        size: textSize,
+        rotationDegrees: textRotation,
+        name: textValue.trim() || 'Text overlay',
+      });
+
+      forceCanvasRender();
+    } catch (error) {
+      enqueueSnackbar(error.toString(), { variant: 'warning' });
+    }
+  };
+
   const handleModeChange = (newMode) => {
     setMode(newMode);
+  };
+
+  const handleImageFileChange = async (file: File) => {
+    try {
+      const canvas = await createImageCanvas(file);
+      setImageCanvas(canvas);
+      setImageName(file.name);
+    } catch (error) {
+      enqueueSnackbar(error.toString(), { variant: 'error' });
+    }
   };
 
   const handlePointerOverModel = () => {
@@ -179,9 +275,29 @@ export default function Editor({ onSettingsChange }: Props) {
             },
           }}
         />
+        <OverlayBrushPanel
+          mode={mode}
+          imageName={imageName}
+          imageRotation={imageRotation}
+          imageSize={imageSize}
+          onImageRotationChange={setImageRotation}
+          onImageSelect={handleImageFileChange}
+          onImageSizeChange={setImageSize}
+          onTextChange={setTextValue}
+          onTextRotationChange={setTextRotation}
+          onTextSizeChange={setTextSize}
+          text={textValue}
+          textRotation={textRotation}
+          textSize={textSize}
+        />
         {object && (
           <div style={{ height: '100%' }} ref={editorRef}>
             <ThreeJsCanvas
+              continuousPaint={
+                mode === 'mesh' ||
+                mode === 'triangle' ||
+                mode === 'triangle_neighbors'
+              }
               geometry={object}
               onSelect={handleSelect}
               onPointerOverModel={handlePointerOverModel}

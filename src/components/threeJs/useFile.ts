@@ -43,8 +43,20 @@ export default function useFile(
           const geometry = child.geometry as THREE.BufferGeometry;
           const attributes = geometry.attributes;
 
-          child.material = new THREE.MeshLambertMaterial({
-            color: 0xffffff,
+          const currentMaterial = Array.isArray(child.material)
+            ? child.material[0]
+            : child.material;
+
+          child.material = new THREE.MeshPhongMaterial({
+            color:
+              (currentMaterial as THREE.MeshStandardMaterial)?.color?.clone() ||
+              new THREE.Color(0xffffff),
+            map: (currentMaterial as THREE.MeshStandardMaterial)?.map ?? null,
+            transparent:
+              (currentMaterial as THREE.MeshStandardMaterial)?.transparent ??
+              false,
+            opacity:
+              (currentMaterial as THREE.MeshStandardMaterial)?.opacity ?? 1,
             vertexColors: !!attributes.color,
             flatShading: true,
           });

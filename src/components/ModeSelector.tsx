@@ -2,7 +2,9 @@ import ColorizeIcon from '@mui/icons-material/Colorize';
 import CreateIcon from '@mui/icons-material/Create';
 import FileDownloadIcon from '@mui/icons-material/FileDownload';
 import FormatPaintIcon from '@mui/icons-material/FormatPaint';
+import ImageIcon from '@mui/icons-material/Image';
 import PaletteIcon from '@mui/icons-material/Palette';
+import TextFieldsIcon from '@mui/icons-material/TextFields';
 import type { SxProps } from '@mui/material';
 import Box from '@mui/material/Box';
 import ButtonGroup from '@mui/material/ButtonGroup';
@@ -15,7 +17,13 @@ import { HexColorPicker } from 'react-colorful';
 import TriangleNeighborsButton from './ModeSelector/TriangleNeighborsButton';
 import UseNewModelButton from './ModeSelector/UseNewModelButton';
 
-export type Mode = 'mesh' | 'triangle' | 'triangle_neighbors' | 'select_color';
+export type Mode =
+  | 'mesh'
+  | 'triangle'
+  | 'triangle_neighbors'
+  | 'select_color'
+  | 'text'
+  | 'image';
 type Props = {
   color: string;
   mode: Mode;
@@ -128,6 +136,24 @@ export default function ModeSelector({
           sx={mode === 'select_color' ? selectedStyle : style}
         >
           <ColorizeIcon />
+        </IconButton>
+      </Tooltip>
+
+      <Tooltip title="Add text on top of a solid" placement="right">
+        <IconButton
+          onClick={handleModeClick('text')}
+          sx={mode === 'text' ? selectedStyle : style}
+        >
+          <TextFieldsIcon />
+        </IconButton>
+      </Tooltip>
+
+      <Tooltip title="Add an image on top of a solid" placement="right">
+        <IconButton
+          onClick={handleModeClick('image')}
+          sx={mode === 'image' ? selectedStyle : style}
+        >
+          <ImageIcon />
         </IconButton>
       </Tooltip>
 

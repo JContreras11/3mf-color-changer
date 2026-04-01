@@ -7,6 +7,7 @@ import { Environment } from './Environment';
 import Model from './Model';
 
 type Props = JSX.IntrinsicElements['group'] & {
+  continuousPaint?: boolean;
   geometry: THREE.Object3D;
   onSelect: (e) => void;
   onPointerOverModel: (e) => void;
@@ -14,6 +15,7 @@ type Props = JSX.IntrinsicElements['group'] & {
 };
 
 export default function ThreeJsCanvas({
+  continuousPaint = true,
   geometry,
   onSelect,
   onPointerOverModel,
@@ -69,7 +71,7 @@ export default function ThreeJsCanvas({
         cameraControlRef.current?.connect(
           document.getElementById('editor-canvas')!
         );
-      } else if (e.object) {
+      } else if (continuousPaint && e.object) {
         // TODO We might need to debounce here
         onSelect(e);
       }
