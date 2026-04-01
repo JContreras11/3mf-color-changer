@@ -23,14 +23,17 @@ const router = createHashRouter([
     loader: () => {
       // Load settings from local storage
       if (localStorage) {
-        const settings: Settings = JSON.parse(
+        const settings = JSON.parse(
           localStorage.getItem('settings') || '{}'
-        );
+        ) as Settings & { mode?: string };
 
-        // Workaround: Vertex neighbors mode can not be used from the start, because
-        // neighbors for the model have to be loaded first.
+        // Migrate legacy/removed modes to the closest supported tools.
         if (settings.mode === 'triangle_neighbors') {
           settings.mode = 'triangle';
+        } else if (settings.mode === 'add_text') {
+          settings.mode = 'text';
+        } else if (settings.mode === 'add_image_decal') {
+          settings.mode = 'image';
         }
 
         return settings;

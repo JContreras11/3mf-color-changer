@@ -18,7 +18,6 @@ import {
   getRasterOverlayDimensions,
   getRasterOverlayPlacement,
 } from '../utils/threejs/rasterOverlayPlacement';
-import sameVector3 from '../utils/threejs/sameVector3';
 import { useJobContext } from './JobProvider';
 import ModeSelector, { Mode } from './ModeSelector';
 import OverlayBrushPanel from './OverlayBrushPanel';
@@ -144,8 +143,6 @@ export default function Editor({ onSettingsChange }: Props) {
       handleMeshColorChange(e.object.uuid, workingColor);
     } else if (mode === 'triangle') {
       handleFaceColorChange(e, workingColor);
-    } else if (mode === 'triangle_neighbors') {
-      handleFaceNeighborColorChange(e, workingColor);
     } else if (mode === 'select_color' && e.face) {
       setWorkingColor(getFaceColor(e.object as THREE.Mesh, e.face));
     } else if (mode === 'image') {
@@ -175,48 +172,6 @@ export default function Editor({ onSettingsChange }: Props) {
 
     if (e.face) {
       changeFaceColor(mesh, color, e.face);
-    }
-  };
-
-  // This function will color a single face on a mesh, and will seek its
-  // neighbors which have the same orentation as the initial face
-  const handleFaceNeighborColorChange = async (
-    e: ThreeEvent<MouseEvent>,
-    color
-  ) => {
-    const mesh = e.object as THREE.Mesh;
-
-    if (e.face) {
-      const initialFace = getFace(mesh, e.faceIndex!);
-
-      // Change the color of the initial face
-      changeFaceColor(mesh, color, e.face);
-
-      const visitedNeighbors: number[] = [];
-      const walkNeighbors = (
-        neighborFaceIndex: number,
-        expectedNormal: THREE.Vector3
-      ) => {
-        if (visitedNeighbors.includes(neighborFaceIndex)) {
-          return;
-        }
-        const face = getFace(mesh, neighborFaceIndex);
-
-        visitedNeighbors.push(neighborFaceIndex);
-
-        if (!sameVector3(face.normal, expectedNormal)) {
-          return;
-        }
-
-        changeFaceColor(mesh, color, face);
-        mesh.userData.neighbors[neighborFaceIndex].forEach((neighbor) => {
-          walkNeighbors(neighbor, expectedNormal);
-        });
-      };
-
-      mesh.userData.neighbors[e.faceIndex!].forEach((neighbor) => {
-        walkNeighbors(neighbor, initialFace.normal);
-      });
     }
   };
 
@@ -342,12 +297,7 @@ export default function Editor({ onSettingsChange }: Props) {
 
   const handlePointerOverModel = () => {
     if (editorRef.current) {
-      if (mode === 'triangle_neighbors') {
-        // TODO Draw a circle around the mouse pointer to indicate brush radius
-        editorRef.current.style.cursor = `crosshair`;
-      } else {
-        editorRef.current.style.cursor = 'crosshair';
-      }
+      editorRef.current.style.cursor = 'crosshair';
     }
   };
 
@@ -519,9 +469,7 @@ export default function Editor({ onSettingsChange }: Props) {
           <div style={{ height: '100%' }} ref={editorRef}>
             <ThreeJsCanvas
               continuousPaint={
-                mode === 'mesh' ||
-                mode === 'triangle' ||
-                mode === 'triangle_neighbors'
+                mode === 'mesh' || mode === 'triangle'
               }
               geometry={object}
               onSelect={handleSelect}

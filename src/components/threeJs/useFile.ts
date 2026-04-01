@@ -1,8 +1,6 @@
 import { useEffect, useState } from 'react';
 import * as THREE from 'three';
 
-import findFaceNeighborsJob from '../../jobs/findFaceNeighbors';
-import { useJobContext } from '../JobProvider';
 import readFromFile from './readFromFile';
 import readFromUrl from './readFromUrl';
 
@@ -10,7 +8,6 @@ export default function useFile(
   file: File | string | undefined
 ): [THREE.Object3D | null, (object: THREE.Object3D | null) => void] {
   const [object, setObject] = useState<THREE.Object3D | null>(null);
-  const jobContext = useJobContext();
 
   // TODO Somehow this useeffect is called twice although the file didn't change.
   useEffect(() => {
@@ -64,8 +61,6 @@ export default function useFile(
           if (child.geometry.index) {
             child.geometry = geometry.toNonIndexed();
           }
-
-          jobContext.addJob(findFaceNeighborsJob(child));
         }
       });
 
