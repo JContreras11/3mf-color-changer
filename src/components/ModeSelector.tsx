@@ -24,6 +24,7 @@ export type Mode =
   | 'image';
 type Props = {
   color: string;
+  disabled?: boolean;
   mode: Mode;
   onColorChange: (color: string) => void;
   onExport: () => void;
@@ -45,6 +46,7 @@ const defaultColors = [
 
 export default function ModeSelector({
   color,
+  disabled = false,
   mode,
   onColorChange,
   onExport,
@@ -54,6 +56,12 @@ export default function ModeSelector({
   const [showColorPicker, setShowColorPicker] = React.useState(false);
   const [colorPickerAnchorEl, setColorPickerAnchorEl] =
     React.useState<HTMLButtonElement>();
+
+  React.useEffect(() => {
+    if (disabled) {
+      setShowColorPicker(false);
+    }
+  }, [disabled]);
 
   const handleModeClick = (newMode: Mode) => () => onModeChange(newMode);
   const handleColorChange = (newColor) => onColorChange(newColor);
@@ -83,6 +91,7 @@ export default function ModeSelector({
         placement="right"
       >
         <IconButton
+          disabled={disabled}
           onClick={handleModeClick('mesh')}
           sx={mode === 'mesh' ? selectedStyle : style}
         >
@@ -95,6 +104,7 @@ export default function ModeSelector({
         placement="right"
       >
         <IconButton
+          disabled={disabled}
           onClick={handleModeClick('triangle')}
           sx={mode === 'triangle' ? selectedStyle : style}
         >
@@ -104,6 +114,7 @@ export default function ModeSelector({
 
       <Tooltip title="Select the painting color" placement="right">
         <IconButton
+          disabled={disabled}
           sx={{
             ...style,
           }}
@@ -123,6 +134,7 @@ export default function ModeSelector({
 
       <Tooltip title="Select the color from a model" placement="right">
         <IconButton
+          disabled={disabled}
           onClick={handleModeClick('select_color')}
           sx={mode === 'select_color' ? selectedStyle : style}
         >
@@ -132,6 +144,7 @@ export default function ModeSelector({
 
       <Tooltip title="Add text on top of a solid" placement="right">
         <IconButton
+          disabled={disabled}
           onClick={handleModeClick('text')}
           sx={mode === 'text' ? selectedStyle : style}
         >
@@ -141,6 +154,7 @@ export default function ModeSelector({
 
       <Tooltip title="Add an image on top of a solid" placement="right">
         <IconButton
+          disabled={disabled}
           onClick={handleModeClick('image')}
           sx={mode === 'image' ? selectedStyle : style}
         >
@@ -151,7 +165,7 @@ export default function ModeSelector({
       <UseNewModelButton buttonSx={{ ...style, mt: 5 }} />
 
       <Tooltip title="Export your changes in a 3MF file" placement="right">
-        <IconButton onClick={handleExportClick} sx={style}>
+        <IconButton disabled={disabled} onClick={handleExportClick} sx={style}>
           <FileDownloadIcon />
         </IconButton>
       </Tooltip>
@@ -160,6 +174,7 @@ export default function ModeSelector({
       {defaultColors.map((d) => (
         <Tooltip title="Set color" placement="right" key={d}>
           <IconButton
+            disabled={disabled}
             onClick={() => handleColorChange(d)}
             sx={{ ...style, backgroundColor: d + ' !important', height: 40 }}
           ></IconButton>
@@ -167,7 +182,7 @@ export default function ModeSelector({
       ))}
 
       <Popover
-        open={showColorPicker}
+        open={!disabled && showColorPicker}
         anchorEl={colorPickerAnchorEl}
         onClose={() => setShowColorPicker(false)}
         anchorOrigin={{

@@ -9,6 +9,7 @@ import React from 'react';
 import { Mode } from './ModeSelector';
 
 type Props = {
+  disabled?: boolean;
   imageName?: string;
   mode: Mode;
   onImageSelect: (file: File) => void;
@@ -25,6 +26,7 @@ type Props = {
 };
 
 export default function OverlayBrushPanel({
+  disabled = false,
   imageName,
   mode,
   onImageSelect,
@@ -58,6 +60,8 @@ export default function OverlayBrushPanel({
         zIndex: 2,
         backgroundColor: 'rgba(33, 33, 33, 0.92)',
         color: 'white',
+        opacity: disabled ? 0.55 : 1,
+        transition: 'opacity 180ms ease',
       }}
     >
       {mode === 'image' ? (
@@ -83,6 +87,7 @@ export default function OverlayBrushPanel({
           />
 
           <Button
+            disabled={disabled}
             variant="contained"
             onClick={() => inputRef.current?.click()}
             sx={{ py: 1.2 }}
@@ -101,6 +106,7 @@ export default function OverlayBrushPanel({
             step={1}
             value={imageSize}
             onChange={onImageSizeChange}
+            disabled={disabled}
           />
 
           <SliderField
@@ -110,6 +116,7 @@ export default function OverlayBrushPanel({
             step={1}
             value={imageRotation}
             onChange={onImageRotationChange}
+            disabled={disabled}
           />
         </Stack>
       ) : (
@@ -119,6 +126,7 @@ export default function OverlayBrushPanel({
           </Typography>
 
           <TextField
+            disabled={disabled}
             value={text}
             onChange={(event) => onTextChange(event.target.value)}
             label="Text"
@@ -144,6 +152,7 @@ export default function OverlayBrushPanel({
             step={1}
             value={textSize}
             onChange={onTextSizeChange}
+            disabled={disabled}
           />
 
           <SliderField
@@ -153,6 +162,7 @@ export default function OverlayBrushPanel({
             step={1}
             value={textRotation}
             onChange={onTextRotationChange}
+            disabled={disabled}
           />
         </Stack>
       )}
@@ -161,6 +171,7 @@ export default function OverlayBrushPanel({
 }
 
 type SliderFieldProps = {
+  disabled?: boolean;
   label: string;
   max: number;
   min: number;
@@ -170,6 +181,7 @@ type SliderFieldProps = {
 };
 
 function SliderField({
+  disabled = false,
   label,
   max,
   min,
@@ -181,6 +193,7 @@ function SliderField({
     <Stack spacing={1}>
       <Typography>{label}</Typography>
       <Slider
+        disabled={disabled}
         value={value}
         min={min}
         max={max}

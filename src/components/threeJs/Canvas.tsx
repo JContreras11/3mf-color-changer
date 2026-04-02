@@ -9,6 +9,7 @@ import Model from './Model';
 type Props = JSX.IntrinsicElements['group'] & {
   continuousPaint?: boolean;
   geometry: THREE.Object3D;
+  onModelReady?: () => void;
   onSelect: (e) => void;
   onPointerMoveModel?: (e) => void;
   onPointerOverModel: (e) => void;
@@ -18,6 +19,7 @@ type Props = JSX.IntrinsicElements['group'] & {
 export default function ThreeJsCanvas({
   continuousPaint = true,
   geometry,
+  onModelReady,
   onSelect,
   onPointerMoveModel,
   onPointerOverModel,
@@ -109,6 +111,7 @@ export default function ThreeJsCanvas({
       <Environment />
       <Model
         geometry={geometry}
+        onReady={onModelReady}
         onClick={handleClick}
         onPointerDown={handlePointerDown}
         onPointerUp={handlePointerUp}

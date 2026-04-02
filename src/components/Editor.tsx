@@ -1,11 +1,13 @@
 import Box from '@mui/material/Box';
+import CircularProgress from '@mui/material/CircularProgress';
+import Stack from '@mui/material/Stack';
+import Typography from '@mui/material/Typography';
 import { enqueueSnackbar } from 'notistack';
 import { ThreeEvent } from '@react-three/fiber';
 import React, { useEffect } from 'react';
 import { useLoaderData, useLocation } from 'react-router-dom';
 import * as THREE from 'three';
 
-import config from '../etc/config.json';
 import exportFileJob from '../jobs/exportFile';
 import applyRasterOverlay from '../utils/threejs/applyRasterOverlay';
 import changeFaceColor from '../utils/threejs/changeFaceColor';
@@ -24,6 +26,8 @@ import OverlayBrushPanel from './OverlayBrushPanel';
 import PermanentDrawer from './PermanentDrawer';
 import ThreeJsCanvas from './threeJs/Canvas';
 import useFile from './threeJs/useFile';
+
+const BRAND_TITLE = 'CustomCaps';
 
 type GhostOverlay = {
   camera: THREE.Camera;
@@ -65,7 +69,6 @@ export default function Editor({ onSettingsChange }: Props) {
   const settings = useLoaderData() as Settings;
   const location = useLocation();
   const searchParams = new URLSearchParams(location.search);
-  const title = config.title;
   const file = location.state?.file || searchParams.get('example');
   const { addJob } = useJobContext();
 
@@ -74,7 +77,7 @@ export default function Editor({ onSettingsChange }: Props) {
     return null;
   }
 
-  const [object] = useFile(file);
+  const [object, , fileState] = useFile(file);
   const [mode, setMode] = React.useState<Mode>(settings?.mode || 'mesh');
   const [workingColor, setWorkingColor] = React.useState<string>(
     settings?.workingColor || '#f00'
@@ -95,8 +98,17 @@ export default function Editor({ onSettingsChange }: Props) {
   const [ghostOverlay, setGhostOverlay] = React.useState<GhostOverlay | null>(
     null
   );
+  const [isSceneReady, setIsSceneReady] = React.useState(false);
   const [, setSceneRevision] = React.useState(0);
   const editorRef = React.useRef<HTMLDivElement>(null);
+  const handleModelReady = React.useCallback(() => {
+    setIsSceneReady(true);
+  }, []);
+  const isEditorLoading = fileState.isLoading || (!!object && !isSceneReady);
+  const loadingTitle = object ? 'Preparing your workspace' : 'Loading 3MF file';
+  const loadingDescription = object
+    ? 'Almost there — enabling tools as soon as the model is mounted.'
+    : 'Some 3MF files take a few seconds to unzip and parse. The editor will unlock automatically.';
   const textCanvas = React.useMemo(() => {
     try {
       return createTextCanvas(textValue, workingColor);
@@ -119,6 +131,11 @@ export default function Editor({ onSettingsChange }: Props) {
   }, [mode, workingColor]);
 
   useEffect(() => {
+    setIsSceneReady(false);
+    setGhostOverlay(null);
+  }, [file, object]);
+
+  useEffect(() => {
     if (!imageFile) {
       setImagePreviewUrl(null);
       return;
@@ -138,7 +155,17 @@ export default function Editor({ onSettingsChange }: Props) {
     }
   }, [mode]);
 
+  useEffect(() => {
+    if (fileState.error) {
+      enqueueSnackbar(fileState.error.message, { variant: 'error' });
+    }
+  }, [fileState.error]);
+
   const handleSelect = (e: ThreeEvent<MouseEvent>) => {
+    if (isEditorLoading) {
+      return;
+    }
+
     if (mode === 'mesh') {
       handleMeshColorChange(e.object.uuid, workingColor);
     } else if (mode === 'triangle') {
@@ -153,6 +180,10 @@ export default function Editor({ onSettingsChange }: Props) {
   };
 
   const handleExport = async () => {
+    if (!object || isEditorLoading) {
+      return;
+    }
+
     addJob(exportFileJob(file, object!));
   };
 
@@ -266,6 +297,11 @@ export default function Editor({ onSettingsChange }: Props) {
   };
 
   const handlePointerMoveModel = (e: ThreeEvent<PointerEvent>) => {
+    if (isEditorLoading) {
+      setGhostOverlay(null);
+      return;
+    }
+
     const previewCanvas =
       mode === 'image' ? imageCanvas : mode === 'text' ? textCanvas : null;
 
@@ -296,6 +332,10 @@ export default function Editor({ onSettingsChange }: Props) {
   };
 
   const handlePointerOverModel = () => {
+    if (isEditorLoading) {
+      return;
+    }
+
     if (editorRef.current) {
       editorRef.current.style.cursor = 'crosshair';
     }
@@ -342,10 +382,11 @@ export default function Editor({ onSettingsChange }: Props) {
       : null;
 
   return (
-    <PermanentDrawer title={title}>
+    <PermanentDrawer title={BRAND_TITLE}>
       <Box component="div" sx={{ position: 'relative', height: '100%' }}>
         <ModeSelector
           color={workingColor}
+          disabled={isEditorLoading}
           mode={mode}
           onColorChange={handleWorkingColorChange}
           onExport={handleExport}
@@ -365,6 +406,7 @@ export default function Editor({ onSettingsChange }: Props) {
           }}
         />
         <OverlayBrushPanel
+          disabled={isEditorLoading}
           mode={mode}
           imageName={imageName}
           imageRotation={imageRotation}
@@ -465,20 +507,87 @@ export default function Editor({ onSettingsChange }: Props) {
             </Box>
           </>
         )}
-        {object && (
-          <div style={{ height: '100%' }} ref={editorRef}>
+        <div
+          ref={editorRef}
+          style={{
+            height: '100%',
+            pointerEvents: isEditorLoading ? 'none' : 'auto',
+          }}
+        >
+          {object && (
             <ThreeJsCanvas
               continuousPaint={
                 mode === 'mesh' || mode === 'triangle'
               }
               geometry={object}
+              onModelReady={handleModelReady}
               onSelect={handleSelect}
               onPointerMoveModel={handlePointerMoveModel}
               onPointerOverModel={handlePointerOverModel}
               onPointerOutModel={handlePointerOutModel}
             />
-          </div>
-        )}
+          )}
+        </div>
+        <Box
+          component="div"
+          aria-busy={isEditorLoading}
+          aria-live="polite"
+          sx={{
+            position: 'absolute',
+            inset: 0,
+            display: 'grid',
+            placeItems: 'center',
+            opacity: isEditorLoading ? 1 : 0,
+            pointerEvents: 'none',
+            transition: 'opacity 180ms ease',
+            zIndex: isEditorLoading ? 5 : -1,
+            background:
+              'radial-gradient(circle at top, rgba(0,88,188,0.08), transparent 38%), rgba(248,249,250,0.72)',
+            backdropFilter: isEditorLoading ? 'blur(10px)' : 'blur(0px)',
+          }}
+        >
+          <Stack
+            spacing={2}
+            alignItems="center"
+            sx={{
+              width: 'min(460px, calc(100vw - 48px))',
+              px: { xs: 3, md: 4 },
+              py: { xs: 3, md: 3.5 },
+              borderRadius: '28px',
+              bgcolor: 'rgba(255,255,255,0.88)',
+              boxShadow: '0 24px 80px rgba(15, 23, 42, 0.10)',
+              border: '1px solid rgba(0, 88, 188, 0.12)',
+              textAlign: 'center',
+            }}
+          >
+            <CircularProgress
+              size={44}
+              thickness={4}
+              sx={{ color: '#0058bc' }}
+            />
+            <Typography
+              sx={{
+                fontFamily: '"Manrope", "Inter", sans-serif',
+                fontSize: { xs: 24, md: 30 },
+                fontWeight: 800,
+                letterSpacing: '-0.04em',
+                color: '#111827',
+              }}
+            >
+              {loadingTitle}
+            </Typography>
+            <Typography
+              sx={{
+                maxWidth: 360,
+                color: '#4b5563',
+                fontSize: { xs: 14, md: 15 },
+                lineHeight: 1.6,
+              }}
+            >
+              {loadingDescription}
+            </Typography>
+          </Stack>
+        </Box>
       </Box>
     </PermanentDrawer>
   );
