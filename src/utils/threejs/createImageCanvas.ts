@@ -1,39 +1,46 @@
+const MAX_IMAGE_CANVAS_SIZE = 1400;
+
 export default function createImageCanvas(
   file: File
 ): Promise<HTMLCanvasElement> {
   return new Promise((resolve, reject) => {
-    const reader = new FileReader();
+    const imageUrl = URL.createObjectURL(file);
+    const image = new Image();
 
-    reader.addEventListener('error', () => {
-      reject(new Error(`Could not read image "${file.name}".`));
+    const cleanup = () => {
+      URL.revokeObjectURL(imageUrl);
+    };
+
+    image.addEventListener('error', () => {
+      cleanup();
+      reject(new Error(`Could not load image "${file.name}".`));
     });
 
-    reader.addEventListener('load', () => {
-      const image = new Image();
+    image.addEventListener('load', () => {
+      const longestSide = Math.max(image.width, image.height);
+      const scale = longestSide
+        ? Math.min(1, MAX_IMAGE_CANVAS_SIZE / longestSide)
+        : 1;
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.max(1, Math.round(image.width * scale));
+      canvas.height = Math.max(1, Math.round(image.height * scale));
 
-      image.addEventListener('error', () => {
-        reject(new Error(`Could not load image "${file.name}".`));
-      });
+      const context = canvas.getContext('2d');
 
-      image.addEventListener('load', () => {
-        const canvas = document.createElement('canvas');
-        canvas.width = image.width;
-        canvas.height = image.height;
+      if (!context) {
+        cleanup();
+        reject(new Error('Could not create an image canvas.'));
+        return;
+      }
 
-        const context = canvas.getContext('2d');
-
-        if (!context) {
-          reject(new Error('Could not create an image canvas.'));
-          return;
-        }
-
-        context.drawImage(image, 0, 0);
-        resolve(canvas);
-      });
-
-      image.src = reader.result as string;
+      context.imageSmoothingEnabled = true;
+      context.imageSmoothingQuality = 'high';
+      context.clearRect(0, 0, canvas.width, canvas.height);
+      context.drawImage(image, 0, 0, canvas.width, canvas.height);
+      cleanup();
+      resolve(canvas);
     });
 
-    reader.readAsDataURL(file);
+    image.src = imageUrl;
   });
 }

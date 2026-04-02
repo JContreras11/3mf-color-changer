@@ -1,4 +1,6 @@
 import ThreeDRotationRoundedIcon from '@mui/icons-material/ThreeDRotationRounded';
+import RedoRoundedIcon from '@mui/icons-material/RedoRounded';
+import UndoRoundedIcon from '@mui/icons-material/UndoRounded';
 import VideocamRoundedIcon from '@mui/icons-material/VideocamRounded';
 import ZoomInRoundedIcon from '@mui/icons-material/ZoomInRounded';
 import ZoomOutRoundedIcon from '@mui/icons-material/ZoomOutRounded';
@@ -7,6 +9,7 @@ import Button from '@mui/material/Button';
 import CircularProgress from '@mui/material/CircularProgress';
 import IconButton from '@mui/material/IconButton';
 import Stack from '@mui/material/Stack';
+import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { alpha } from '@mui/material/styles';
 import { ThreeEvent } from '@react-three/fiber';
@@ -25,6 +28,7 @@ import exportFileJob from '../jobs/exportFile';
 import applyRasterOverlay from '../utils/threejs/applyRasterOverlay';
 import changeFaceColor from '../utils/threejs/changeFaceColor';
 import changeMeshColor from '../utils/threejs/changeMeshColor';
+import cloneObjectForHistory from '../utils/threejs/cloneObjectForHistory';
 import createImageCanvas from '../utils/threejs/createImageCanvas';
 import createTextCanvas from '../utils/threejs/createTextCanvas';
 import getFace from '../utils/threejs/getFace';
@@ -47,6 +51,7 @@ const DEFAULT_TEXT = 'Text';
 const DEFAULT_TEXT_ROTATION = 0;
 const DEFAULT_TEXT_SIZE = 24;
 const DEFAULT_WORKING_COLOR = '#f00';
+const MAX_HISTORY_STEPS = 30;
 
 type GhostOverlay = {
   camera: THREE.Camera;
@@ -76,6 +81,12 @@ type OverlayGhostPreview = {
   width: number;
 };
 
+type PendingOverlayKind = 'image' | 'text' | null;
+type HistoryAvailability = {
+  canRedo: boolean;
+  canUndo: boolean;
+};
+
 export type Settings = {
   workingColor?: string;
   mode?: Mode;
@@ -101,7 +112,7 @@ export default function Editor({ onSettingsChange }: Props) {
   const initialMode = settings?.mode || 'mesh';
   const initialWorkingColor = settings?.workingColor || DEFAULT_WORKING_COLOR;
 
-  const [object, , fileState] = useFile(file);
+  const [object, setObject, fileState] = useFile(file);
   const [mode, setMode] = React.useState<Mode>(initialMode);
   const [activePanel, setActivePanel] = React.useState<DesignPanel>(
     getDesignPanelFromMode(initialMode)
@@ -127,10 +138,20 @@ export default function Editor({ onSettingsChange }: Props) {
   const [ghostOverlay, setGhostOverlay] = React.useState<GhostOverlay | null>(
     null
   );
+  const [pendingOverlayKind, setPendingOverlayKind] =
+    React.useState<PendingOverlayKind>(null);
+  const [historyAvailability, setHistoryAvailability] =
+    React.useState<HistoryAvailability>({
+      canRedo: false,
+      canUndo: false,
+    });
   const [isSceneReady, setIsSceneReady] = React.useState(false);
   const [, setSceneRevision] = React.useState(0);
   const canvasControlsRef = React.useRef<ThreeJsCanvasHandle | null>(null);
   const editorRef = React.useRef<HTMLDivElement>(null);
+  const undoStackRef = React.useRef<THREE.Object3D[]>([]);
+  const redoStackRef = React.useRef<THREE.Object3D[]>([]);
+  const paintStrokeActiveRef = React.useRef(false);
   const handleModelReady = React.useCallback(() => {
     setIsSceneReady(true);
   }, []);
@@ -145,11 +166,28 @@ export default function Editor({ onSettingsChange }: Props) {
   );
   const canUseCuratedAddons =
     capFamily === 'trucker' && typeof file === 'string';
+  const canUndo = historyAvailability.canUndo;
+  const canRedo = historyAvailability.canRedo;
+  const showHistoryControls = canUndo || canRedo;
+  const isApplyingOverlay = pendingOverlayKind !== null;
   const isEditorLoading = fileState.isLoading || (!!object && !isSceneReady);
-  const loadingTitle = object ? 'Preparing your atelier view' : 'Loading 3MF file';
-  const loadingDescription = object
+  const isEditorBusy = isEditorLoading || isApplyingOverlay;
+  const modelLoadingTitle = object
+    ? 'Preparing your atelier view'
+    : 'Loading 3MF file';
+  const modelLoadingDescription = object
     ? 'Almost there — controls unlock as soon as the model finishes mounting in the canvas.'
     : 'Some 3MF files take a few seconds to unzip and parse. The editor will unlock automatically.';
+  const processingTitle =
+    pendingOverlayKind === 'image' ? 'Projecting image' : 'Projecting text';
+  const processingDescription =
+    pendingOverlayKind === 'image'
+      ? 'Optimizing and projecting your graphic onto the cap surface.'
+      : 'Calculating the text projection and fitting it onto the cap surface.';
+  const busyTitle = isApplyingOverlay ? processingTitle : modelLoadingTitle;
+  const busyDescription = isApplyingOverlay
+    ? processingDescription
+    : modelLoadingDescription;
   const addonPanelDescription = canUseCuratedAddons
     ? `Swap between curated ${capFamilyLabel} accessory variations. Selecting one reloads the matching 3MF directly in the browser.`
     : capFamily === 'custom'
@@ -179,7 +217,11 @@ export default function Editor({ onSettingsChange }: Props) {
   useEffect(() => {
     setIsSceneReady(false);
     setGhostOverlay(null);
-  }, [file, object]);
+  }, [file]);
+
+  useEffect(() => {
+    setGhostOverlay(null);
+  }, [object]);
 
   useEffect(() => {
     if (!imageFile) {
@@ -206,6 +248,67 @@ export default function Editor({ onSettingsChange }: Props) {
       enqueueSnackbar(fileState.error.message, { variant: 'error' });
     }
   }, [fileState.error]);
+
+  const syncHistoryAvailability = React.useCallback(() => {
+    setHistoryAvailability({
+      canRedo: redoStackRef.current.length > 0,
+      canUndo: undoStackRef.current.length > 0,
+    });
+  }, []);
+
+  const resetHistory = React.useCallback(() => {
+    undoStackRef.current = [];
+    redoStackRef.current = [];
+    paintStrokeActiveRef.current = false;
+    syncHistoryAvailability();
+  }, [syncHistoryAvailability]);
+
+  const createHistorySnapshot = React.useCallback(
+    (sourceObject: THREE.Object3D | null) => {
+      if (!sourceObject) {
+        return null;
+      }
+
+      return cloneObjectForHistory(sourceObject);
+    },
+    []
+  );
+
+  const pushUndoSnapshot = React.useCallback(
+    (snapshot: THREE.Object3D | null) => {
+      if (!snapshot) {
+        return;
+      }
+
+      undoStackRef.current.push(snapshot);
+
+      if (undoStackRef.current.length > MAX_HISTORY_STEPS) {
+        undoStackRef.current.shift();
+      }
+
+      redoStackRef.current = [];
+      syncHistoryAvailability();
+    },
+    [syncHistoryAvailability]
+  );
+
+  useEffect(() => {
+    resetHistory();
+  }, [file, resetHistory]);
+
+  useEffect(() => {
+    const handlePointerUp = () => {
+      paintStrokeActiveRef.current = false;
+    };
+
+    window.addEventListener('pointerup', handlePointerUp);
+    window.addEventListener('pointercancel', handlePointerUp);
+
+    return () => {
+      window.removeEventListener('pointerup', handlePointerUp);
+      window.removeEventListener('pointercancel', handlePointerUp);
+    };
+  }, []);
 
   const handlePanelChange = React.useCallback((panel: DesignPanel) => {
     setActivePanel(panel);
@@ -248,30 +351,48 @@ export default function Editor({ onSettingsChange }: Props) {
   }, []);
 
   const handleSelect = (e: ThreeEvent<MouseEvent>) => {
-    if (isEditorLoading || activePanel === 'objects') {
+    if (isEditorBusy || activePanel === 'objects') {
       return;
     }
 
     if (mode === 'mesh') {
-      handleMeshColorChange(e.object.uuid, workingColor);
+      performSyncSceneMutation(
+        () => {
+          handleMeshColorChange(e.object.uuid, workingColor);
+        },
+        {
+          batchDuringStroke: e.type === 'pointermove',
+        }
+      );
     } else if (mode === 'triangle') {
-      handleFaceColorChange(e, workingColor);
+      if (!e.face) {
+        return;
+      }
+
+      performSyncSceneMutation(
+        () => {
+          handleFaceColorChange(e, workingColor);
+        },
+        {
+          batchDuringStroke: e.type === 'pointermove',
+        }
+      );
     } else if (mode === 'select_color' && e.face) {
       setWorkingColor(getFaceColor(e.object as THREE.Mesh, e.face));
     } else if (mode === 'image') {
-      handleImageOverlay(e);
+      void handleImageOverlay(e);
     } else if (mode === 'text') {
-      handleTextOverlay(e);
+      void handleTextOverlay(e);
     }
   };
 
   const handleExport = React.useCallback(async () => {
-    if (!object || isEditorLoading) {
+    if (!object || isEditorBusy) {
       return;
     }
 
     addJob(exportFileJob(file, object));
-  }, [addJob, file, isEditorLoading, object]);
+  }, [addJob, file, isEditorBusy, object]);
 
   const handleMeshColorChange = (uuid, color: string) => {
     object?.traverse((child) => {
@@ -291,15 +412,118 @@ export default function Editor({ onSettingsChange }: Props) {
     }
   };
 
-  const handleWorkingColorChange = (color) => {
+  const handleWorkingColorChange = React.useCallback((color) => {
     setWorkingColor(color);
-  };
+  }, []);
 
-  const forceCanvasRender = () => {
+  const forceCanvasRender = React.useCallback(() => {
     setSceneRevision((prev) => prev + 1);
-  };
+  }, []);
 
-  const handleImageOverlay = (e: ThreeEvent<MouseEvent>) => {
+  const handleUndo = React.useCallback(() => {
+    if (!object || isEditorBusy || undoStackRef.current.length === 0) {
+      return;
+    }
+
+    const previousSnapshot = undoStackRef.current.pop() || null;
+
+    if (!previousSnapshot) {
+      syncHistoryAvailability();
+      return;
+    }
+
+    redoStackRef.current.push(cloneObjectForHistory(object));
+    paintStrokeActiveRef.current = false;
+    setObject(previousSnapshot);
+    setGhostOverlay(null);
+    syncHistoryAvailability();
+  }, [isEditorBusy, object, setObject, syncHistoryAvailability]);
+
+  const handleRedo = React.useCallback(() => {
+    if (!object || isEditorBusy || redoStackRef.current.length === 0) {
+      return;
+    }
+
+    const nextSnapshot = redoStackRef.current.pop() || null;
+
+    if (!nextSnapshot) {
+      syncHistoryAvailability();
+      return;
+    }
+
+    undoStackRef.current.push(cloneObjectForHistory(object));
+    paintStrokeActiveRef.current = false;
+    setObject(nextSnapshot);
+    setGhostOverlay(null);
+    syncHistoryAvailability();
+  }, [isEditorBusy, object, setObject, syncHistoryAvailability]);
+
+  const performSyncSceneMutation = React.useCallback(
+    (
+      mutate: () => void,
+      options?: {
+        batchDuringStroke?: boolean;
+      }
+    ) => {
+      if (!object) {
+        return;
+      }
+
+      const shouldBatchDuringStroke = !!options?.batchDuringStroke;
+      const shouldCaptureSnapshot =
+        !shouldBatchDuringStroke || !paintStrokeActiveRef.current;
+      const snapshot = shouldCaptureSnapshot
+        ? createHistorySnapshot(object)
+        : null;
+
+      if (shouldBatchDuringStroke) {
+        paintStrokeActiveRef.current = true;
+      }
+
+      mutate();
+
+      if (shouldCaptureSnapshot) {
+        pushUndoSnapshot(snapshot);
+      }
+
+      forceCanvasRender();
+    },
+    [createHistorySnapshot, forceCanvasRender, object, pushUndoSnapshot]
+  );
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (shouldIgnoreEditorShortcut(event)) {
+        return;
+      }
+
+      const key = event.key.toLowerCase();
+      const usesModifier = event.metaKey || event.ctrlKey;
+      const wantsUndo = usesModifier && !event.shiftKey && key === 'z';
+      const wantsRedo =
+        (event.ctrlKey && !event.metaKey && !event.shiftKey && key === 'y') ||
+        (usesModifier && event.shiftKey && key === 'z');
+
+      if (wantsUndo) {
+        event.preventDefault();
+        handleUndo();
+        return;
+      }
+
+      if (wantsRedo) {
+        event.preventDefault();
+        handleRedo();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [handleRedo, handleUndo]);
+
+  const handleImageOverlay = async (e: ThreeEvent<MouseEvent>) => {
     if (!imageCanvas) {
       enqueueSnackbar('Select an image before placing it on the model.', {
         variant: 'warning',
@@ -317,22 +541,27 @@ export default function Editor({ onSettingsChange }: Props) {
       return;
     }
 
-    applyRasterOverlay({
-      camera: e.camera as THREE.Camera,
-      root: object,
-      targetMesh: mesh,
-      pointWorld: e.point.clone(),
-      face: e.face,
-      canvas: imageCanvas,
-      size: imageSize,
-      rotationDegrees: imageRotation,
-      name: imageName || 'Image overlay',
-    });
+    const camera = e.camera as THREE.Camera;
+    const pointWorld = e.point.clone();
+    const overlayFace = e.face;
+    const overlayName = imageName || 'Image overlay';
 
-    forceCanvasRender();
+    await runOverlayPlacement('image', async () => {
+      await applyRasterOverlay({
+        camera,
+        root: object,
+        targetMesh: mesh,
+        pointWorld,
+        face: overlayFace,
+        canvas: imageCanvas,
+        size: imageSize,
+        rotationDegrees: imageRotation,
+        name: overlayName,
+      });
+    }, object);
   };
 
-  const handleTextOverlay = (e: ThreeEvent<MouseEvent>) => {
+  const handleTextOverlay = async (e: ThreeEvent<MouseEvent>) => {
     if (!e.face || !object) {
       return;
     }
@@ -348,25 +577,30 @@ export default function Editor({ onSettingsChange }: Props) {
         throw new Error('Please enter some text before placing it on the model.');
       }
 
-      applyRasterOverlay({
-        camera: e.camera as THREE.Camera,
-        root: object,
-        targetMesh: mesh,
-        pointWorld: e.point.clone(),
-        face: e.face,
-        canvas: textCanvas,
-        size: textSize,
-        rotationDegrees: textRotation,
-        name: textValue.trim() || 'Text overlay',
-      });
+      const camera = e.camera as THREE.Camera;
+      const pointWorld = e.point.clone();
+      const overlayFace = e.face;
+      const overlayName = textValue.trim() || 'Text overlay';
 
-      forceCanvasRender();
+      await runOverlayPlacement('text', async () => {
+        await applyRasterOverlay({
+          camera,
+          root: object,
+          targetMesh: mesh,
+          pointWorld,
+          face: overlayFace,
+          canvas: textCanvas,
+          size: textSize,
+          rotationDegrees: textRotation,
+          name: overlayName,
+        });
+      }, object);
     } catch (error) {
       enqueueSnackbar(error.toString(), { variant: 'warning' });
     }
   };
 
-  const handleImageFileChange = async (uploadedFile: File) => {
+  const handleImageFileChange = React.useCallback(async (uploadedFile: File) => {
     try {
       const canvas = await createImageCanvas(uploadedFile);
       setImageCanvas(canvas);
@@ -375,11 +609,11 @@ export default function Editor({ onSettingsChange }: Props) {
     } catch (error) {
       enqueueSnackbar(error.toString(), { variant: 'error' });
     }
-  };
+  }, []);
 
   const handlePointerMoveModel = (e: ThreeEvent<PointerEvent>) => {
     if (
-      isEditorLoading ||
+      isEditorBusy ||
       activePanel === 'objects' ||
       (activePanel === 'graphics' && mode !== 'image') ||
       (activePanel === 'text' && mode !== 'text')
@@ -418,7 +652,7 @@ export default function Editor({ onSettingsChange }: Props) {
   };
 
   const handlePointerOverModel = () => {
-    if (isEditorLoading || activePanel === 'objects') {
+    if (isEditorBusy || activePanel === 'objects') {
       return;
     }
 
@@ -434,6 +668,30 @@ export default function Editor({ onSettingsChange }: Props) {
 
     setGhostOverlay(null);
   };
+
+  const runOverlayPlacement = React.useCallback(
+    async (
+      kind: Exclude<PendingOverlayKind, null>,
+      action: () => Promise<void>,
+      sourceObject: THREE.Object3D | null
+    ) => {
+      setPendingOverlayKind(kind);
+      setGhostOverlay(null);
+
+      try {
+        await waitForNextPaint(2);
+        const snapshot = createHistorySnapshot(sourceObject);
+        await action();
+        pushUndoSnapshot(snapshot);
+        forceCanvasRender();
+      } catch (error) {
+        enqueueSnackbar(error.toString(), { variant: 'error' });
+      } finally {
+        setPendingOverlayKind(null);
+      }
+    },
+    [createHistorySnapshot, forceCanvasRender, pushUndoSnapshot]
+  );
 
   const handleResetMaterials = React.useCallback(() => {
     setWorkingColor(initialWorkingColor);
@@ -480,7 +738,7 @@ export default function Editor({ onSettingsChange }: Props) {
 
   const handleAddonSelect = React.useCallback(
     (option: (typeof TRUCKER_ADDON_OPTIONS)[number]) => {
-      if (isEditorLoading) {
+      if (isEditorBusy) {
         return;
       }
 
@@ -506,7 +764,7 @@ export default function Editor({ onSettingsChange }: Props) {
       canUseCuratedAddons,
       capFamily,
       capFamilyLabel,
-      isEditorLoading,
+      isEditorBusy,
       navigate,
       selectedAddonId,
     ]
@@ -547,9 +805,58 @@ export default function Editor({ onSettingsChange }: Props) {
         })
       : null;
 
+  const floatingControls = [
+    ...(showHistoryControls
+      ? [
+          {
+            disabled: !canUndo || isEditorBusy,
+            icon: <UndoRoundedIcon />,
+            key: 'undo',
+            label: 'Undo (Ctrl/Cmd+Z)',
+            onClick: handleUndo,
+          },
+          {
+            disabled: !canRedo || isEditorBusy,
+            icon: <RedoRoundedIcon />,
+            key: 'redo',
+            label: 'Redo (Ctrl+Y / Cmd+Shift+Z)',
+            onClick: handleRedo,
+          },
+        ]
+      : []),
+    {
+      disabled: !object || isEditorBusy,
+      icon: <VideocamRoundedIcon />,
+      key: 'reset-view',
+      label: 'Reset view',
+      onClick: () => canvasControlsRef.current?.resetView(),
+    },
+    {
+      disabled: !object || isEditorBusy,
+      icon: <ThreeDRotationRoundedIcon />,
+      key: 'orbit-left',
+      label: 'Rotate view',
+      onClick: () => canvasControlsRef.current?.orbitLeft(),
+    },
+    {
+      disabled: !object || isEditorBusy,
+      icon: <ZoomInRoundedIcon />,
+      key: 'zoom-in',
+      label: 'Zoom in',
+      onClick: () => canvasControlsRef.current?.zoomIn(),
+    },
+    {
+      disabled: !object || isEditorBusy,
+      icon: <ZoomOutRoundedIcon />,
+      key: 'zoom-out',
+      label: 'Zoom out',
+      onClick: () => canvasControlsRef.current?.zoomOut(),
+    },
+  ] as const;
+
   const exportAction = (
     <Button
-      disabled={!object || isEditorLoading}
+      disabled={!object || isEditorBusy}
       onClick={handleExport}
       sx={{
         px: { xs: 2.75, md: 3.5 },
@@ -589,7 +896,7 @@ export default function Editor({ onSettingsChange }: Props) {
       >
         <ModeSelector
           activePanel={activePanel}
-          disabled={isEditorLoading}
+          disabled={isEditorBusy}
           onPanelChange={handlePanelChange}
           sx={{
             position: 'absolute',
@@ -733,7 +1040,7 @@ export default function Editor({ onSettingsChange }: Props) {
               sx={{
                 position: 'relative',
                 height: '100%',
-                pointerEvents: isEditorLoading ? 'none' : 'auto',
+                pointerEvents: isEditorBusy ? 'none' : 'auto',
                 '& canvas': {
                   outline: 'none',
                 },
@@ -758,15 +1065,6 @@ export default function Editor({ onSettingsChange }: Props) {
             <Stack
               direction="row"
               spacing={1}
-              divider={
-                <Box
-                  sx={{
-                    width: 1,
-                    alignSelf: 'stretch',
-                    bgcolor: alpha('#c1c6d7', 0.5),
-                  }}
-                />
-              }
               sx={{
                 position: 'absolute',
                 bottom: 22,
@@ -781,52 +1079,44 @@ export default function Editor({ onSettingsChange }: Props) {
                 boxShadow: '0 18px 36px rgba(15, 23, 42, 0.10)',
               }}
             >
-              <IconButton
-                disabled={!object || isEditorLoading}
-                onClick={() => canvasControlsRef.current?.resetView()}
-                sx={floatingControlButtonSx}
-              >
-                <VideocamRoundedIcon />
-              </IconButton>
-              <IconButton
-                disabled={!object || isEditorLoading}
-                onClick={() => canvasControlsRef.current?.orbitLeft()}
-                sx={floatingControlButtonSx}
-              >
-                <ThreeDRotationRoundedIcon />
-              </IconButton>
-              <IconButton
-                disabled={!object || isEditorLoading}
-                onClick={() => canvasControlsRef.current?.zoomIn()}
-                sx={floatingControlButtonSx}
-              >
-                <ZoomInRoundedIcon />
-              </IconButton>
-              <IconButton
-                disabled={!object || isEditorLoading}
-                onClick={() => canvasControlsRef.current?.zoomOut()}
-                sx={floatingControlButtonSx}
-              >
-                <ZoomOutRoundedIcon />
-              </IconButton>
+              {floatingControls.map((control, index) => (
+                <React.Fragment key={control.key}>
+                  {index > 0 && (
+                    <Box
+                      sx={{
+                        width: 1,
+                        alignSelf: 'stretch',
+                        bgcolor: alpha('#c1c6d7', 0.5),
+                      }}
+                    />
+                  )}
+                  <FloatingControlButton
+                    disabled={control.disabled}
+                    label={control.label}
+                    onClick={control.onClick}
+                  >
+                    {control.icon}
+                  </FloatingControlButton>
+                </React.Fragment>
+              ))}
             </Stack>
 
             <Box
               component="div"
-              aria-busy={isEditorLoading}
+              aria-busy={isEditorBusy}
               aria-live="polite"
               sx={{
                 position: 'absolute',
                 inset: 0,
                 display: 'grid',
                 placeItems: 'center',
-                opacity: isEditorLoading ? 1 : 0,
+                opacity: isEditorBusy ? 1 : 0,
                 pointerEvents: 'none',
                 transition: 'opacity 180ms ease',
-                zIndex: isEditorLoading ? 5 : -1,
+                zIndex: isEditorBusy ? 5 : -1,
                 background:
                   'radial-gradient(circle at top, rgba(0,88,188,0.08), transparent 38%), rgba(248,249,250,0.72)',
-                backdropFilter: isEditorLoading ? 'blur(10px)' : 'blur(0px)',
+                backdropFilter: isEditorBusy ? 'blur(10px)' : 'blur(0px)',
               }}
             >
               <Stack
@@ -857,7 +1147,7 @@ export default function Editor({ onSettingsChange }: Props) {
                     color: '#111827',
                   }}
                 >
-                  {loadingTitle}
+                  {busyTitle}
                 </Typography>
                 <Typography
                   sx={{
@@ -867,7 +1157,7 @@ export default function Editor({ onSettingsChange }: Props) {
                     lineHeight: 1.6,
                   }}
                 >
-                  {loadingDescription}
+                  {busyDescription}
                 </Typography>
               </Stack>
             </Box>
@@ -881,7 +1171,7 @@ export default function Editor({ onSettingsChange }: Props) {
             addonPanelDescription={addonPanelDescription}
             addonsEnabled={canUseCuratedAddons}
             color={workingColor}
-            disabled={isEditorLoading}
+            disabled={isEditorBusy}
             imageName={imageName}
             imageRotation={imageRotation}
             imageSize={imageSize}
@@ -931,6 +1221,33 @@ const floatingControlButtonSx = {
     bgcolor: alpha('#ffffff', 0.92),
   },
 };
+
+function FloatingControlButton({
+  children,
+  disabled,
+  label,
+  onClick,
+}: {
+  children: React.ReactNode;
+  disabled: boolean;
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <Tooltip title={label} arrow enterDelay={180}>
+      <Box component="span" sx={{ display: 'inline-flex' }}>
+        <IconButton
+          aria-label={label}
+          disabled={disabled}
+          onClick={onClick}
+          sx={floatingControlButtonSx}
+        >
+          {children}
+        </IconButton>
+      </Box>
+    </Tooltip>
+  );
+}
 
 function getOverlayGhostPreview({
   bounds,
@@ -1114,4 +1431,41 @@ function solveLinearSystem(matrix: number[][], values: number[]) {
   }
 
   return augmented.map((row) => row[size]);
+}
+
+function waitForNextPaint(frames = 1) {
+  return new Promise<void>((resolve) => {
+    const step = (remainingFrames: number) => {
+      window.requestAnimationFrame(() => {
+        if (remainingFrames <= 1) {
+          resolve();
+          return;
+        }
+
+        step(remainingFrames - 1);
+      });
+    };
+
+    step(frames);
+  });
+}
+
+function shouldIgnoreEditorShortcut(event: KeyboardEvent) {
+  const target = event.target as HTMLElement | null;
+
+  if (!target) {
+    return false;
+  }
+
+  if (target.isContentEditable) {
+    return true;
+  }
+
+  const tagName = target.tagName;
+
+  return (
+    tagName === 'INPUT' ||
+    tagName === 'TEXTAREA' ||
+    tagName === 'SELECT'
+  );
 }

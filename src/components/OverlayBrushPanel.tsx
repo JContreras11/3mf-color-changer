@@ -88,7 +88,7 @@ const panelCopy: Record<
   },
 };
 
-export default function OverlayBrushPanel({
+const OverlayBrushPanel = React.memo(function OverlayBrushPanel({
   activePanel,
   addonOptions,
   addonPanelDescription,
@@ -635,7 +635,9 @@ export default function OverlayBrushPanel({
       )}
     </Paper>
   );
-}
+});
+
+export default OverlayBrushPanel;
 
 function ModeOptionGroup({
   mode,

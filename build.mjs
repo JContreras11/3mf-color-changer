@@ -26,7 +26,8 @@ const options = {
       assets: {
         from: [
           './public/**/*.3mf',
-          './public/*.png',
+          './public/**/*.png',
+          './public/**/*.webp',
           './public/*.ico',
           './public/*.webmanifest',
         ],

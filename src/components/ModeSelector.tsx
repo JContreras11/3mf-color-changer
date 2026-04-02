@@ -62,7 +62,7 @@ const panelItems = [
   tooltip: string;
 }[];
 
-export default function ModeSelector({
+const ModeSelector = React.memo(function ModeSelector({
   activePanel,
   disabled = false,
   onPanelChange,
@@ -150,4 +150,6 @@ export default function ModeSelector({
       })}
     </Box>
   );
-}
+});
+
+export default ModeSelector;

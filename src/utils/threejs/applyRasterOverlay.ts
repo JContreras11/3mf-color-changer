@@ -19,12 +19,14 @@ type Props = {
 };
 
 const ALPHA_THRESHOLD = 24;
-const MAX_SEGMENTS = 180;
-const MIN_SEGMENTS = 16;
-const SEGMENTS_PER_MM = 3;
+const MAX_SEGMENTS = 64;
+const MIN_SEGMENTS = 8;
+const SEGMENTS_PER_MM = 1;
 const SURFACE_OFFSET = 0.05;
+const YIELD_EVERY_ROWS = 4;
+const FACE_NORMAL_WORLD = new THREE.Vector3();
 
-export default function applyRasterOverlay({
+export default async function applyRasterOverlay({
   camera,
   root,
   targetMesh,
@@ -34,7 +36,7 @@ export default function applyRasterOverlay({
   size,
   rotationDegrees = 0,
   name,
-}: Props) {
+}: Props): Promise<THREE.Mesh> {
   const dimensions = getRasterOverlayDimensions(canvas, size);
   const placement = getRasterOverlayPlacement({
     camera,
@@ -46,7 +48,7 @@ export default function applyRasterOverlay({
     targetMesh,
     width: dimensions.width,
   });
-  const geometry = createOverlayGeometry(
+  const geometry = await createOverlayGeometry(
     canvas,
     placement,
     root,
@@ -57,6 +59,9 @@ export default function applyRasterOverlay({
   );
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
+  texture.generateMipmaps = false;
+  texture.minFilter = THREE.LinearFilter;
+  texture.magFilter = THREE.LinearFilter;
   texture.needsUpdate = true;
 
   const material = new THREE.MeshBasicMaterial({
@@ -87,87 +92,46 @@ export default function applyRasterOverlay({
   return mesh;
 }
 
-function createOverlayGeometry(
-  canvas: HTMLCanvasElement,
-  placement: ReturnType<typeof getRasterOverlayPlacement>,
-  root: THREE.Object3D,
-  targetMesh: THREE.Mesh,
-  width: number,
-  height: number,
-  aspect: number
+function getOpaqueCells(
+  imageData: Uint8ClampedArray,
+  cols: number,
+  rows: number
 ) {
-  const { cols, rows } = getSegmentCounts(width, height, aspect);
+  const opaqueCells = new Uint8Array(cols * rows);
 
-  const imageData = getRasterData(canvas, cols, rows);
-  const positions = new Float32Array((cols + 1) * (rows + 1) * 3);
-  const uvs = new Float32Array((cols + 1) * (rows + 1) * 2);
-  const indices: number[] = [];
-  const hits = new Array<boolean>((cols + 1) * (rows + 1)).fill(false);
-  const normalWorld = localDirectionToWorld(root, placement.normalRoot);
-  const rayHeight = Math.max(width, height) * 2 + 2;
-  const raycaster = new THREE.Raycaster();
-
-  const cellWidth = width / cols;
-  const cellHeight = height / rows;
-  const xStart = -width / 2;
-  const yStart = -height / 2;
-
-  for (let row = 0; row <= rows; row += 1) {
-    for (let col = 0; col <= cols; col += 1) {
-      const vertexIndex = row * (cols + 1) + col;
-      const x = xStart + col * cellWidth;
-      const y = yStart + row * cellHeight;
-      const planePointRoot = new THREE.Vector3(x, y, 0)
-        .applyQuaternion(placement.quaternionRoot)
-        .add(placement.positionRoot);
-      const projectedPoint = projectPointToSurface(
-        planePointRoot,
-        normalWorld,
-        rayHeight,
-        raycaster,
-        root,
-        targetMesh
-      );
-      const position = projectedPoint || planePointRoot;
-
-      positions[vertexIndex * 3] = position.x;
-      positions[vertexIndex * 3 + 1] = position.y;
-      positions[vertexIndex * 3 + 2] = position.z;
-      uvs[vertexIndex * 2] = col / cols;
-      uvs[vertexIndex * 2 + 1] = 1 - row / rows;
-      hits[vertexIndex] = !!projectedPoint;
-    }
+  for (let index = 0; index < cols * rows; index += 1) {
+    opaqueCells[index] = imageData[index * 4 + 3] >= ALPHA_THRESHOLD ? 1 : 0;
   }
+
+  return opaqueCells;
+}
+
+function getActiveVertices(
+  opaqueCells: Uint8Array,
+  cols: number,
+  rows: number
+) {
+  const activeVertices = new Uint8Array((cols + 1) * (rows + 1));
 
   for (let row = 0; row < rows; row += 1) {
     for (let col = 0; col < cols; col += 1) {
-      const pixelIndex = (row * cols + col) * 4;
-      const alpha = imageData[pixelIndex + 3];
-
-      if (alpha < ALPHA_THRESHOLD) {
+      if (!opaqueCells[row * cols + col]) {
         continue;
       }
 
-      const i00 = row * (cols + 1) + col;
-      const i10 = i00 + 1;
-      const i01 = (row + 1) * (cols + 1) + col;
-      const i11 = i01 + 1;
+      const topLeft = row * (cols + 1) + col;
+      const topRight = topLeft + 1;
+      const bottomLeft = (row + 1) * (cols + 1) + col;
+      const bottomRight = bottomLeft + 1;
 
-      if (!hits[i00] || !hits[i10] || !hits[i01] || !hits[i11]) {
-        continue;
-      }
-
-      indices.push(i00, i10, i11, i00, i11, i01);
+      activeVertices[topLeft] = 1;
+      activeVertices[topRight] = 1;
+      activeVertices[bottomLeft] = 1;
+      activeVertices[bottomRight] = 1;
     }
   }
 
-  const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-  geometry.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
-  geometry.setIndex(indices);
-  geometry.computeVertexNormals();
-
-  return geometry;
+  return activeVertices;
 }
 
 function getRasterData(
@@ -191,20 +155,118 @@ function getRasterData(
   return context.getImageData(0, 0, width, height).data;
 }
 
+async function createOverlayGeometry(
+  canvas: HTMLCanvasElement,
+  placement: ReturnType<typeof getRasterOverlayPlacement>,
+  root: THREE.Object3D,
+  targetMesh: THREE.Mesh,
+  width: number,
+  height: number,
+  aspect: number
+) {
+  const { cols, rows } = getSegmentCounts(width, height, aspect);
+
+  const imageData = getRasterData(canvas, cols, rows);
+  const opaqueCells = getOpaqueCells(imageData, cols, rows);
+  const activeVertices = getActiveVertices(opaqueCells, cols, rows);
+  const positions = new Float32Array((cols + 1) * (rows + 1) * 3);
+  const uvs = new Float32Array((cols + 1) * (rows + 1) * 2);
+  const indices: number[] = [];
+  const hits = new Uint8Array((cols + 1) * (rows + 1));
+  const normalWorld = localDirectionToWorld(root, placement.normalRoot);
+  const rayDirectionWorld = normalWorld.clone().negate();
+  const rayHeight = Math.max(width, height) * 2 + 2;
+  const raycaster = new THREE.Raycaster();
+  const planePointRoot = new THREE.Vector3();
+  const placementQuaternion = placement.quaternionRoot;
+  const placementPosition = placement.positionRoot;
+
+  const cellWidth = width / cols;
+  const cellHeight = height / rows;
+  const xStart = -width / 2;
+  const yStart = -height / 2;
+
+  for (let row = 0; row <= rows; row += 1) {
+    if (row > 0 && row % YIELD_EVERY_ROWS === 0) {
+      await waitForNextPaint();
+    }
+
+    for (let col = 0; col <= cols; col += 1) {
+      const vertexIndex = row * (cols + 1) + col;
+      const x = xStart + col * cellWidth;
+      const y = yStart + row * cellHeight;
+      planePointRoot
+        .set(x, y, 0)
+        .applyQuaternion(placementQuaternion)
+        .add(placementPosition);
+      const requiresProjection = activeVertices[vertexIndex];
+      const projectedPoint = requiresProjection
+        ? projectPointToSurface(
+            planePointRoot,
+            normalWorld,
+            rayDirectionWorld,
+            rayHeight,
+            raycaster,
+            root,
+            targetMesh
+          )
+        : null;
+      const position = projectedPoint || planePointRoot;
+
+      positions[vertexIndex * 3] = position.x;
+      positions[vertexIndex * 3 + 1] = position.y;
+      positions[vertexIndex * 3 + 2] = position.z;
+      uvs[vertexIndex * 2] = col / cols;
+      uvs[vertexIndex * 2 + 1] = 1 - row / rows;
+      hits[vertexIndex] = requiresProjection && projectedPoint ? 1 : 0;
+    }
+  }
+
+  for (let row = 0; row < rows; row += 1) {
+    for (let col = 0; col < cols; col += 1) {
+      const cellIndex = row * cols + col;
+
+      if (!opaqueCells[cellIndex]) {
+        continue;
+      }
+
+      const i00 = row * (cols + 1) + col;
+      const i10 = i00 + 1;
+      const i01 = (row + 1) * (cols + 1) + col;
+      const i11 = i01 + 1;
+
+      if (!hits[i00] || !hits[i10] || !hits[i01] || !hits[i11]) {
+        continue;
+      }
+
+      indices.push(i00, i10, i11, i00, i11, i01);
+    }
+  }
+
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  geometry.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
+  geometry.setIndex(indices);
+
+  return geometry;
+}
+
 function projectPointToSurface(
   planePointRoot: THREE.Vector3,
   normalWorld: THREE.Vector3,
+  rayDirectionWorld: THREE.Vector3,
   rayHeight: number,
   raycaster: THREE.Raycaster,
   root: THREE.Object3D,
   targetMesh: THREE.Mesh
 ) {
   const planePointWorld = root.localToWorld(planePointRoot.clone());
-  const rayDirection = normalWorld.clone().negate().normalize();
-  const rayOrigin = planePointWorld.clone().add(normalWorld.clone().multiplyScalar(rayHeight));
+  const rayOrigin = planePointWorld
+    .clone()
+    .add(normalWorld.clone().multiplyScalar(rayHeight));
   const hit = raycastSurface(
     rayOrigin,
-    rayDirection,
+    rayDirectionWorld,
     normalWorld,
     rayHeight * 2,
     raycaster,
@@ -246,11 +308,9 @@ function raycastSurface(
         return false;
       }
 
-      return (
-        getSurfaceNormalWorld(targetMesh, intersection.face, intersection.point).dot(
-          expectedNormalWorld
-        ) > 0
-      );
+      return getFaceNormalWorld(targetMesh, intersection.face).dot(
+        expectedNormalWorld
+      ) > 0;
     }) || null;
 
   if (primaryHit) {
@@ -265,13 +325,17 @@ function raycastSurface(
         return false;
       }
 
-      return (
-        getSurfaceNormalWorld(targetMesh, intersection.face, intersection.point).dot(
-          expectedNormalWorld
-        ) > 0
-      );
+      return getFaceNormalWorld(targetMesh, intersection.face).dot(
+        expectedNormalWorld
+      ) > 0;
     }) || null
   );
+}
+
+function getFaceNormalWorld(mesh: THREE.Mesh, face: THREE.Face) {
+  return FACE_NORMAL_WORLD.copy(face.normal)
+    .transformDirection(mesh.matrixWorld)
+    .normalize();
 }
 
 function worldDirectionToLocal(
@@ -321,4 +385,10 @@ function getSegmentCounts(width: number, height: number, aspect: number) {
     ),
     rows: dominantSegments,
   };
+}
+
+function waitForNextPaint() {
+  return new Promise<void>((resolve) => {
+    window.requestAnimationFrame(() => resolve());
+  });
 }

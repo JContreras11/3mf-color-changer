@@ -17,7 +17,7 @@ type CapOption = {
   description: string;
   eta: string;
   id: string;
-  illustration: 'trucker' | 'future' | 'bucket';
+  imagePath: string;
   path: string;
   subtitle: string;
   title: string;
@@ -49,7 +49,7 @@ export default function HomeRoute() {
         description:
           'Classic front panel ready for logos, text and bold multi-color graphics.',
         eta: '12–18 Hours',
-        illustration: 'trucker',
+        imagePath: '/caps/trucker.webp',
         path: 'examples/trucker_cap.3mf',
       },
       {
@@ -59,7 +59,7 @@ export default function HomeRoute() {
         description:
           'A smoother silhouette prepared for premium text placement and clean add-ons.',
         eta: '14–18 Hours',
-        illustration: 'future',
+        imagePath: '/caps/future.webp',
         path: 'examples/future_cap.3mf',
       },
       {
@@ -69,7 +69,7 @@ export default function HomeRoute() {
         description:
           'A wider printable canvas with wraparound customization and softer profiles.',
         eta: '16–22 Hours',
-        illustration: 'bucket',
+        imagePath: '/caps/bucket.webp',
         path: 'examples/bucket_hat.3mf',
       },
     ],
@@ -303,7 +303,7 @@ function CapCard({
           />
         )}
         <Box sx={{ position: 'relative', zIndex: 1 }}>
-          <CapIllustration variant={cap.illustration} />
+          <CapIllustration imagePath={cap.imagePath} title={cap.title} />
         </Box>
       </Box>
 
@@ -459,203 +459,37 @@ function ModePill({
 }
 
 function CapIllustration({
-  variant,
+  imagePath,
+  title,
 }: {
-  variant: CapOption['illustration'];
-}) {
-  if (variant === 'bucket') {
-    return (
-      <Box
-        sx={{
-          position: 'relative',
-          width: '100%',
-          height: { xs: 180, sm: 210, md: 250 },
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}
-      >
-        <Box
-          sx={{
-            position: 'relative',
-            width: { xs: 180, sm: 210, md: 240 },
-            height: { xs: 150, sm: 175, md: 200 },
-          }}
-        >
-          <Box
-            sx={{
-              position: 'absolute',
-              top: 0,
-              left: '50%',
-              transform: 'translateX(-50%)',
-              width: { xs: 96, sm: 114, md: 132 },
-              height: { xs: 30, sm: 36, md: 42 },
-              borderRadius: '50% / 58%',
-              bgcolor: '#2f3945',
-            }}
-          />
-          <Box
-            sx={{
-              position: 'absolute',
-              top: 28,
-              left: '50%',
-              transform: 'translateX(-50%)',
-              width: { xs: 122, sm: 142, md: 166 },
-              height: { xs: 78, sm: 92, md: 106 },
-              borderRadius: '36% 36% 42% 42% / 24% 24% 36% 36%',
-              bgcolor: '#2f3945',
-              boxShadow: 'inset 0 -10px 20px rgba(255,255,255,0.06)',
-            }}
-          />
-          <Box
-            sx={{
-              position: 'absolute',
-              bottom: 0,
-              left: '50%',
-              transform: 'translateX(-50%) perspective(600px) rotateX(58deg)',
-              width: { xs: 180, sm: 210, md: 240 },
-              height: { xs: 46, sm: 56, md: 68 },
-              borderRadius: '50%',
-              bgcolor: '#2f3945',
-              boxShadow: '0 24px 28px rgba(0,0,0,0.16)',
-            }}
-          />
-        </Box>
-      </Box>
-    );
-  }
-
-  if (variant === 'future') {
-    return (
-      <BaseballCapIllustration
-        frontColor="#355e87"
-        brimColor="#274a6d"
-        meshColor="#355e87"
-        solid
-      />
-    );
-  }
-
-  return (
-    <BaseballCapIllustration
-      frontColor="#f8f8f6"
-      brimColor="#1f222a"
-      meshColor="#2f323b"
-    />
-  );
-}
-
-function BaseballCapIllustration({
-  brimColor,
-  frontColor,
-  meshColor,
-  solid = false,
-}: {
-  brimColor: string;
-  frontColor: string;
-  meshColor: string;
-  solid?: boolean;
+  imagePath: string;
+  title: string;
 }) {
   return (
     <Box
-        sx={{
-          position: 'relative',
-          width: '100%',
-          height: { xs: 180, sm: 210, md: 250 },
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
+      sx={{
+        width: '100%',
+        height: { xs: 180, sm: 210, md: 250 },
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
       }}
     >
       <Box
+        component="img"
+        src={imagePath}
+        alt={title}
+        loading="lazy"
+        decoding="async"
         sx={{
-          position: 'relative',
-          width: { xs: 190, sm: 224, md: 266 },
-          height: { xs: 150, sm: 178, md: 210 },
+          width: '100%',
+          height: '100%',
+          objectFit: 'contain',
+          userSelect: 'none',
+          WebkitUserDrag: 'none',
+          filter: 'drop-shadow(0 20px 26px rgba(15, 23, 42, 0.14))',
         }}
-      >
-        <Box
-          sx={{
-            position: 'absolute',
-            top: 6,
-            left: '50%',
-            transform: 'translateX(-50%)',
-            width: { xs: 24, md: 34 },
-            height: { xs: 12, md: 17 },
-            borderRadius: '50% / 60%',
-            bgcolor: alpha(brimColor, 0.85),
-            boxShadow: '0 8px 12px rgba(15,23,42,0.12)',
-            zIndex: 4,
-          }}
-        />
-        <Box
-          sx={{
-            position: 'absolute',
-            top: 18,
-            left: '50%',
-            transform: 'translateX(-50%)',
-            width: { xs: 128, sm: 154, md: 184 },
-            height: { xs: 98, sm: 118, md: 144 },
-            borderRadius: '50% 50% 18% 18% / 58% 58% 14% 14%',
-            bgcolor: frontColor,
-            border: solid ? 'none' : '1px solid rgba(31,34,42,0.18)',
-            boxShadow: solid
-              ? '0 28px 28px rgba(53,94,135,0.18)'
-              : '0 28px 28px rgba(31,34,42,0.12)',
-            zIndex: 3,
-          }}
-        />
-        {!solid && (
-          <>
-            <Box
-              sx={{
-                position: 'absolute',
-                top: 26,
-                left: { xs: 12, md: 18 },
-                width: { xs: 52, sm: 64, md: 78 },
-                height: { xs: 86, sm: 102, md: 122 },
-                borderRadius: '62% 18% 24% 32% / 52% 12% 36% 32%',
-                bgcolor: meshColor,
-                opacity: 0.96,
-                transform: 'rotate(-6deg)',
-                zIndex: 2,
-              }}
-            />
-            <Box
-              sx={{
-                position: 'absolute',
-                top: 26,
-                right: { xs: 12, md: 18 },
-                width: { xs: 52, sm: 64, md: 78 },
-                height: { xs: 86, sm: 102, md: 122 },
-                borderRadius: '18% 62% 32% 24% / 12% 52% 32% 36%',
-                bgcolor: meshColor,
-                opacity: 0.96,
-                transform: 'rotate(6deg)',
-                zIndex: 2,
-              }}
-            />
-          </>
-        )}
-        <Box
-          sx={{
-            position: 'absolute',
-            bottom: 8,
-            left: '50%',
-            transform: 'translateX(-50%) perspective(700px) rotateX(60deg)',
-            width: {
-              xs: solid ? 132 : 146,
-              sm: solid ? 158 : 178,
-              md: solid ? 190 : 210,
-            },
-            height: { xs: 40, sm: 48, md: 60 },
-            borderRadius: '50%',
-            bgcolor: brimColor,
-            boxShadow: '0 20px 26px rgba(15,23,42,0.22)',
-            zIndex: 1,
-          }}
-        />
-      </Box>
+      />
     </Box>
   );
 }
