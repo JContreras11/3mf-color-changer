@@ -1,3 +1,5 @@
+import type * as THREE from 'three';
+
 export function getFaceCount(mesh: THREE.Mesh) {
   const geometry = mesh.geometry as THREE.BufferGeometry;
   const index = geometry.index;

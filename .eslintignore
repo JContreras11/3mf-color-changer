@@ -1,0 +1,5 @@
+.next
+node_modules
+dist
+
+src/utils/threejs/PatchedThreeMFLoader.js

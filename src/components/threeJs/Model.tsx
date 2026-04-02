@@ -1,7 +1,9 @@
 import { Center } from '@react-three/drei';
+import type { ThreeElements } from '@react-three/fiber';
 import React, { useEffect, useRef } from 'react';
+import * as THREE from 'three';
 
-type Props = JSX.IntrinsicElements['mesh'] & {
+type Props = Omit<ThreeElements['mesh'], 'geometry'> & {
   geometry: THREE.Object3D;
   onReady?: () => void;
 };
@@ -30,7 +32,6 @@ export default function Model({ geometry, onReady, ...props }: Props) {
   }, [geometry, onReady]);
 
   return (
-    // Center object
     <Center cacheKey={geometry.uuid} disableY>
       {/* eslint-disable-next-line react/no-unknown-property */}
       <mesh castShadow receiveShadow {...props}>

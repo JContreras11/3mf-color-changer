@@ -1,3 +1,5 @@
+'use client';
+
 import ThreeDRotationRoundedIcon from '@mui/icons-material/ThreeDRotationRounded';
 import RedoRoundedIcon from '@mui/icons-material/RedoRounded';
 import UndoRoundedIcon from '@mui/icons-material/UndoRounded';
@@ -14,8 +16,8 @@ import Typography from '@mui/material/Typography';
 import { alpha } from '@mui/material/styles';
 import { ThreeEvent } from '@react-three/fiber';
 import { enqueueSnackbar } from 'notistack';
+import { useRouter } from 'next/navigation';
 import React, { useEffect } from 'react';
-import { useLoaderData, useLocation, useNavigate } from 'react-router-dom';
 import * as THREE from 'three';
 
 import {
@@ -37,6 +39,7 @@ import {
   getRasterOverlayDimensions,
   getRasterOverlayPlacement,
 } from '../utils/threejs/rasterOverlayPlacement';
+import { useEditorFile } from './EditorFileContext';
 import { useJobContext } from './JobProvider';
 import ModeSelector, { DesignPanel, Mode } from './ModeSelector';
 import OverlayBrushPanel from './OverlayBrushPanel';
@@ -93,24 +96,26 @@ export type Settings = {
 };
 
 type Props = {
+  examplePath?: string;
   onSettingsChange?: (settings: Settings) => void;
 };
 
-export default function Editor({ onSettingsChange }: Props) {
-  const settings = useLoaderData() as Settings;
-  const location = useLocation();
-  const navigate = useNavigate();
-  const searchParams = new URLSearchParams(location.search);
-  const file = location.state?.file || searchParams.get('example');
+export default function Editor({ examplePath, onSettingsChange }: Props) {
+  const { uploadedFile } = useEditorFile();
   const { addJob } = useJobContext();
+  const router = useRouter();
+  const initialSettingsRef = React.useRef<Settings>(loadEditorSettings());
+  const file = examplePath || uploadedFile || undefined;
 
-  if (!file) {
-    window.location.href = '/';
-    return null;
-  }
+  useEffect(() => {
+    if (!file) {
+      router.replace('/');
+    }
+  }, [file, router]);
 
-  const initialMode = settings?.mode || 'mesh';
-  const initialWorkingColor = settings?.workingColor || DEFAULT_WORKING_COLOR;
+  const initialMode = initialSettingsRef.current.mode || 'mesh';
+  const initialWorkingColor =
+    initialSettingsRef.current.workingColor || DEFAULT_WORKING_COLOR;
 
   const [object, setObject, fileState] = useFile(file);
   const [mode, setMode] = React.useState<Mode>(initialMode);
@@ -196,7 +201,7 @@ export default function Editor({ onSettingsChange }: Props) {
   const textCanvas = React.useMemo(() => {
     try {
       return createTextCanvas(textValue, workingColor);
-    } catch (error) {
+    } catch {
       return null;
     }
   }, [textValue, workingColor]);
@@ -206,12 +211,13 @@ export default function Editor({ onSettingsChange }: Props) {
   );
 
   useEffect(() => {
-    if (onSettingsChange) {
-      onSettingsChange({
-        mode,
-        workingColor,
-      });
-    }
+    const nextSettings = {
+      mode,
+      workingColor,
+    };
+
+    persistEditorSettings(nextSettings);
+    onSettingsChange?.(nextSettings);
   }, [mode, onSettingsChange, workingColor]);
 
   useEffect(() => {
@@ -387,7 +393,7 @@ export default function Editor({ onSettingsChange }: Props) {
   };
 
   const handleExport = React.useCallback(async () => {
-    if (!object || isEditorBusy) {
+    if (!file || !object || isEditorBusy) {
       return;
     }
 
@@ -758,14 +764,14 @@ export default function Editor({ onSettingsChange }: Props) {
         return;
       }
 
-      navigate('/editor?example=' + encodeURIComponent(option.path));
+      router.push('/editor?example=' + encodeURIComponent(option.path));
     },
     [
       canUseCuratedAddons,
       capFamily,
       capFamilyLabel,
       isEditorBusy,
-      navigate,
+      router,
       selectedAddonId,
     ]
   );
@@ -878,6 +884,10 @@ export default function Editor({ onSettingsChange }: Props) {
       Export .3MF
     </Button>
   );
+
+  if (!file) {
+    return null;
+  }
 
   return (
     <PermanentDrawer title={BRAND_TITLE} action={exportAction}>
@@ -1431,6 +1441,69 @@ function solveLinearSystem(matrix: number[][], values: number[]) {
   }
 
   return augmented.map((row) => row[size]);
+}
+
+function loadEditorSettings(): Settings {
+  if (typeof window === 'undefined') {
+    return {};
+  }
+
+  try {
+    const rawValue = window.localStorage.getItem('settings');
+
+    if (!rawValue) {
+      return {};
+    }
+
+    const parsed = JSON.parse(rawValue) as Settings & { mode?: string };
+
+    return {
+      ...parsed,
+      mode: normalizeEditorMode(parsed.mode),
+    };
+  } catch {
+    return {};
+  }
+}
+
+function persistEditorSettings(settings: Settings) {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  try {
+    window.localStorage.setItem('settings', JSON.stringify(settings));
+  } catch {
+    // Ignore storage write failures (private mode, quota, etc.).
+  }
+}
+
+function normalizeEditorMode(mode: Settings['mode'] | string | undefined):
+  | Mode
+  | undefined {
+  if (mode === 'triangle_neighbors') {
+    return 'triangle';
+  }
+
+  if (mode === 'add_text') {
+    return 'text';
+  }
+
+  if (mode === 'add_image_decal') {
+    return 'image';
+  }
+
+  if (
+    mode === 'mesh' ||
+    mode === 'triangle' ||
+    mode === 'select_color' ||
+    mode === 'text' ||
+    mode === 'image'
+  ) {
+    return mode;
+  }
+
+  return undefined;
 }
 
 function waitForNextPaint(frames = 1) {

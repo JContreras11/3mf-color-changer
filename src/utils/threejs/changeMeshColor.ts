@@ -19,6 +19,16 @@ export default function changeMeshColor(mesh: THREE.Mesh, color: string) {
 
   // Fill the color buffer with the new color
   mesh.geometry.setAttribute('color', attribute);
-  mesh.material.vertexColors = true;
-  mesh.material.needsUpdate = true;
+
+  const materials = Array.isArray(mesh.material)
+    ? mesh.material
+    : [mesh.material];
+
+  materials.forEach((material) => {
+    if ('vertexColors' in material) {
+      material.vertexColors = true;
+    }
+
+    material.needsUpdate = true;
+  });
 }

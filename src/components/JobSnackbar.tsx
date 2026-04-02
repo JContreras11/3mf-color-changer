@@ -103,10 +103,10 @@ const JobSnackbar = forwardRef<HTMLDivElement, JobSnackbarProps>(
             id="panel1a-header"
           >
             <Grid container>
-              <Grid item xs={2}>
+              <Grid size={2}>
                 <HourglassBottomIcon />
               </Grid>
-              <Grid item xs={10}>
+              <Grid size={10}>
                 <Typography>{props.message}</Typography>
                 <LinearProgress
                   variant={jobs[0].progressVariant || 'determinate'}

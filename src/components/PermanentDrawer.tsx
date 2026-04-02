@@ -1,3 +1,5 @@
+'use client';
+
 import AppBar from '@mui/material/AppBar';
 import Box from '@mui/material/Box';
 import CssBaseline from '@mui/material/CssBaseline';
@@ -7,15 +9,17 @@ import Toolbar from '@mui/material/Toolbar';
 import Typography from '@mui/material/Typography';
 import { alpha } from '@mui/material/styles';
 import * as React from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { usePathname } from 'next/navigation';
+
+import NextLink from './NextLink';
 
 const drawerWidth = 340;
 const brandTitle = 'CustomCaps';
-const steps = [
+const steps: ReadonlyArray<{ label: string; paths: readonly string[] }> = [
   { label: 'Base', paths: ['/'] },
   { label: 'Design', paths: ['/editor'] },
   { label: 'Export', paths: [] },
-] as const;
+];
 
 type Props = {
   action?: React.ReactNode;
@@ -30,9 +34,9 @@ export default function PermanentDrawer({
   title,
   children,
 }: Props) {
-  const location = useLocation();
+  const pathname = usePathname();
   const activeStepIndex = steps.findIndex((step) =>
-    step.paths.includes(location.pathname)
+    step.paths.includes(pathname)
   );
   const toolbarSpacerSx = {
     minHeight: { xs: 110, sm: 76, md: 72 },
@@ -75,7 +79,7 @@ export default function PermanentDrawer({
           >
             <Typography
               noWrap
-              component={Link}
+              component={NextLink}
               sx={{
                 textDecoration: 'none',
                 boxShadow: 'none',
@@ -86,7 +90,7 @@ export default function PermanentDrawer({
                 letterSpacing: '-0.04em',
                 flexShrink: 0,
               }}
-              to="/"
+              href="/"
             >
               {title || brandTitle}
             </Typography>

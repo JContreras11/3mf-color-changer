@@ -52,20 +52,26 @@ export default function useFile(
         nextObject.scale.set(0.01, 0.01, 0.01);
 
         nextObject.traverse(function (child) {
-          child.castShadow = true;
-          child.receiveShadow = true;
+          const sceneChild = child as THREE.Object3D & {
+            castShadow: boolean;
+            receiveShadow: boolean;
+          };
+          const mesh = child as THREE.Mesh;
 
-          if (child.isMesh) {
+          sceneChild.castShadow = true;
+          sceneChild.receiveShadow = true;
+
+          if (mesh.isMesh) {
             // Check if we have a color attribute on the geometry. If we do, we
             // can assume that the model has vertex colors.
-            const geometry = child.geometry as THREE.BufferGeometry;
+            const geometry = mesh.geometry as THREE.BufferGeometry;
             const attributes = geometry.attributes;
 
-            const currentMaterial = Array.isArray(child.material)
-              ? child.material[0]
-              : child.material;
+            const currentMaterial = Array.isArray(mesh.material)
+              ? mesh.material[0]
+              : mesh.material;
 
-            child.material = new THREE.MeshPhongMaterial({
+            mesh.material = new THREE.MeshPhongMaterial({
               color:
                 (currentMaterial as THREE.MeshStandardMaterial)?.color?.clone() ||
                 new THREE.Color(0xffffff),

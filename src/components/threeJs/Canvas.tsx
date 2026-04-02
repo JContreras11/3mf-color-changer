@@ -1,5 +1,5 @@
 import { CameraControls, GizmoHelper, GizmoViewcube } from '@react-three/drei';
-import { Canvas } from '@react-three/fiber';
+import { Canvas, type ThreeElements } from '@react-three/fiber';
 import React from 'react';
 import * as THREE from 'three';
 
@@ -13,7 +13,7 @@ export type ThreeJsCanvasHandle = {
   zoomOut: () => void;
 };
 
-type Props = JSX.IntrinsicElements['group'] & {
+type Props = ThreeElements['group'] & {
   continuousPaint?: boolean;
   geometry: THREE.Object3D;
   onModelReady?: () => void;

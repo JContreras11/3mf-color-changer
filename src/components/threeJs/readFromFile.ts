@@ -1,4 +1,5 @@
-import { ThreeMFLoader } from 'three/examples/jsm/loaders/3MFLoader.js';
+import type * as THREE from 'three';
+import { ThreeMFLoader } from '../../utils/threejs/PatchedThreeMFLoader.js';
 
 export default function readFromFile(
   file: File

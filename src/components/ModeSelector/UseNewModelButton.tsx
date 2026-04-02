@@ -1,3 +1,5 @@
+'use client';
+
 import FiberNewIcon from '@mui/icons-material/FiberNew';
 import {
   Button,
@@ -11,21 +13,21 @@ import type { SxProps } from '@mui/material';
 import Dialog from '@mui/material/Dialog';
 import DialogTitle from '@mui/material/DialogTitle';
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useRouter } from 'next/navigation';
 
 type Props = {
   buttonSx?: SxProps;
 };
 
 export default function UseNewModelButton({ buttonSx }: Props) {
-  const navigate = useNavigate();
+  const router = useRouter();
   const [open, setOpen] = React.useState(false);
 
   const handleResetClick = () => {
     setOpen(true);
   };
   const handleCloseAndNavigate = () => {
-    navigate('/');
+    router.push('/');
     setOpen(false);
   };
   const handleClose = () => {

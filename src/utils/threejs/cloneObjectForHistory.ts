@@ -23,11 +23,11 @@ export default function cloneObjectForHistory(
   const clone = object.clone(true);
 
   clone.traverse((child) => {
-    if (!child.isMesh) {
+    const mesh = child as THREE.Mesh;
+
+    if (!mesh.isMesh) {
       return;
     }
-
-    const mesh = child as THREE.Mesh;
     mesh.geometry = mesh.geometry.clone();
     mesh.material = cloneMaterial(mesh.material);
 

@@ -1,3 +1,5 @@
+'use client';
+
 import ArrowForwardRoundedIcon from '@mui/icons-material/ArrowForwardRounded';
 import CloudUploadRoundedIcon from '@mui/icons-material/CloudUploadRounded';
 import Box from '@mui/material/Box';
@@ -8,8 +10,9 @@ import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import { alpha } from '@mui/material/styles';
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useRouter } from 'next/navigation';
 
+import { useEditorFile } from './EditorFileContext';
 import FileDrop from './FileDrop';
 import PermanentDrawer from './PermanentDrawer';
 
@@ -37,7 +40,8 @@ const DESIGN_COLORS = {
 } as const;
 
 export default function HomeRoute() {
-  const navigate = useNavigate();
+  const router = useRouter();
+  const { clearUploadedFile, setUploadedFile } = useEditorFile();
   const [selectedCapId, setSelectedCapId] = React.useState('trucker-cap');
 
   const capOptions = React.useMemo<CapOption[]>(
@@ -76,13 +80,21 @@ export default function HomeRoute() {
     []
   );
 
-  const handleExampleSelect = (path: string) => {
-    navigate('/editor?example=' + path);
-  };
+  const handleExampleSelect = React.useCallback(
+    (path: string) => {
+      clearUploadedFile();
+      router.push('/editor?example=' + encodeURIComponent(path));
+    },
+    [clearUploadedFile, router]
+  );
 
-  const handleFileChange = (file: File) => {
-    navigate('/editor', { state: { file } });
-  };
+  const handleFileChange = React.useCallback(
+    (file: File) => {
+      setUploadedFile(file);
+      router.push('/editor');
+    },
+    [router, setUploadedFile]
+  );
 
   return (
     <PermanentDrawer title={BRAND_TITLE}>
@@ -144,7 +156,7 @@ export default function HomeRoute() {
             const isSelected = option.id === selectedCapId;
 
             return (
-              <Grid item xs={12} sm={6} lg={4} key={option.id}>
+              <Grid size={{ xs: 12, sm: 6, lg: 4 }} key={option.id}>
                 <CapCard
                   cap={option}
                   selected={isSelected}

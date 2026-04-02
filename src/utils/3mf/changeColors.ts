@@ -38,8 +38,12 @@ export async function changeColors(
   for (const entry of entries) {
     // We process all .model files because 3MF objects might be stored in separate model files (e.g. 3D/Objects/A.model)
     if (!entry.filename.toLowerCase().endsWith('.model')) {
+      if (!('getData' in entry) || typeof entry.getData !== 'function') {
+        continue;
+      }
+
       const writer = new BlobWriter();
-      const data = await entry.getData!(writer);
+      const data = await entry.getData(writer);
       await zipWriter.add(entry.filename, new BlobReader(data));
 
       continue;
@@ -47,7 +51,7 @@ export async function changeColors(
 
     const writer = new TextWriter();
 
-    if (entry.getData) {
+    if ('getData' in entry && typeof entry.getData === 'function') {
       const data = await entry.getData(writer);
       const parser = new DOMParser();
       const xmlDoc = parser.parseFromString(data, 'text/xml');

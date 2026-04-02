@@ -1,39 +1,57 @@
+'use client';
+
 import type { SxProps } from '@mui/material';
 import Box from '@mui/material/Box';
 import { enqueueSnackbar } from 'notistack';
-import React, { useEffect } from 'react';
-import { useDropzone } from 'react-dropzone';
+import React from 'react';
 
 type Props = {
+  children?: React.ReactNode;
   onDrop: (files: File[]) => void;
   sx?: SxProps;
-  children?: React.ReactNode;
 };
 
+const ACCEPTED_TYPES = ['.3mf', 'application/vnd.ms-3mfdocument'] as const;
+
 export default function FileDrop({ children, onDrop, sx }: Props) {
-  const { fileRejections, getRootProps, getInputProps, isDragActive } =
-    useDropzone({
-      onDrop: (files) => {
-        if (files?.length) {
-          onDrop(files);
-        }
-      },
-      accept: {
-        'application/vnd.ms-3mfdocument': ['.3mf'],
-      },
-      maxFiles: 1,
-    });
+  const inputRef = React.useRef<HTMLInputElement | null>(null);
+  const [isDragActive, setIsDragActive] = React.useState(false);
 
-  useEffect(() => {
-    fileRejections.forEach((file) => {
-      file.errors.forEach((error) => {
-        const msg = `${file.file.name} - ${error.message}`;
-        enqueueSnackbar(msg, { variant: 'error' });
-      });
-    });
-  }, [fileRejections]);
+  const validateFiles = React.useCallback(
+    (fileList: FileList | File[] | null | undefined) => {
+      const files = Array.from(fileList || []);
 
-  sx = {
+      if (!files.length) {
+        return;
+      }
+
+      if (files.length > 1) {
+        enqueueSnackbar('Please select a single 3MF file.', {
+          variant: 'error',
+        });
+        return;
+      }
+
+      const [file] = files;
+      const is3mf = file.name.toLowerCase().endsWith('.3mf');
+
+      if (!is3mf) {
+        enqueueSnackbar(`${file.name} - only .3mf files are supported.`, {
+          variant: 'error',
+        });
+        return;
+      }
+
+      onDrop([file]);
+    },
+    [onDrop]
+  );
+
+  const handleOpenPicker = React.useCallback(() => {
+    inputRef.current?.click();
+  }, []);
+
+  const mergedSx = {
     cursor: 'pointer',
     borderStyle: 'dashed',
     borderWidth: 2,
@@ -44,8 +62,49 @@ export default function FileDrop({ children, onDrop, sx }: Props) {
   };
 
   return (
-    <Box component="div" sx={sx} {...getRootProps()}>
-      <input {...getInputProps()} />
+    <Box
+      component="div"
+      role="button"
+      tabIndex={0}
+      sx={mergedSx}
+      onClick={handleOpenPicker}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          handleOpenPicker();
+        }
+      }}
+      onDragEnter={(event) => {
+        event.preventDefault();
+        setIsDragActive(true);
+      }}
+      onDragOver={(event) => {
+        event.preventDefault();
+        setIsDragActive(true);
+      }}
+      onDragLeave={(event) => {
+        event.preventDefault();
+
+        if (event.currentTarget === event.target) {
+          setIsDragActive(false);
+        }
+      }}
+      onDrop={(event) => {
+        event.preventDefault();
+        setIsDragActive(false);
+        validateFiles(event.dataTransfer?.files);
+      }}
+    >
+      <input
+        ref={inputRef}
+        hidden
+        type="file"
+        accept={ACCEPTED_TYPES.join(',')}
+        onChange={(event) => {
+          validateFiles(event.target.files);
+          event.currentTarget.value = '';
+        }}
+      />
       {children}
     </Box>
   );

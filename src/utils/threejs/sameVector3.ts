@@ -1,3 +1,5 @@
+import type * as THREE from 'three';
+
 export default function sameVector3(
   v1: THREE.Vector3,
   v2: THREE.Vector3,
