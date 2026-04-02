@@ -14,17 +14,22 @@ const brandTitle = 'CustomCaps';
 const steps = [
   { label: 'Base', paths: ['/'] },
   { label: 'Design', paths: ['/editor'] },
-  { label: 'Add-ons', paths: [] },
-  { label: 'Review', paths: [] },
+  { label: 'Export', paths: [] },
 ] as const;
 
 type Props = {
+  action?: React.ReactNode;
   menu?: React.ReactNode;
   title: string;
   children: React.ReactNode;
 };
 
-export default function PermanentDrawer({ menu, title, children }: Props) {
+export default function PermanentDrawer({
+  action,
+  menu,
+  title,
+  children,
+}: Props) {
   const location = useLocation();
   const activeStepIndex = steps.findIndex((step) =>
     step.paths.includes(location.pathname)
@@ -60,28 +65,38 @@ export default function PermanentDrawer({ menu, title, children }: Props) {
             py: { xs: 1.25, sm: 0.5 },
           }}
         >
-          <Typography
-            noWrap
-            component={Link}
+          <Box
             sx={{
-              textDecoration: 'none',
-              boxShadow: 'none',
-              color: '#0058bc',
-              fontFamily: '"Manrope", "Inter", sans-serif',
-              fontSize: { xs: 22, sm: 24, md: 30 },
-              fontWeight: 800,
-              letterSpacing: '-0.04em',
+              display: 'flex',
+              width: { xs: '100%', sm: 220, md: 240 },
+              justifyContent: { xs: 'center', sm: 'flex-start' },
               flexShrink: 0,
             }}
-            to="/"
           >
-            {title || brandTitle}
-          </Typography>
+            <Typography
+              noWrap
+              component={Link}
+              sx={{
+                textDecoration: 'none',
+                boxShadow: 'none',
+                color: '#0058bc',
+                fontFamily: '"Manrope", "Inter", sans-serif',
+                fontSize: { xs: 22, sm: 24, md: 30 },
+                fontWeight: 800,
+                letterSpacing: '-0.04em',
+                flexShrink: 0,
+              }}
+              to="/"
+            >
+              {title || brandTitle}
+            </Typography>
+          </Box>
 
           <Stack
             direction="row"
             spacing={{ xs: 2, md: 4 }}
             sx={{
+              flex: 1,
               justifyContent: 'center',
               alignItems: 'center',
               flexWrap: 'wrap',
@@ -126,6 +141,17 @@ export default function PermanentDrawer({ menu, title, children }: Props) {
               );
             })}
           </Stack>
+          <Box
+            sx={{
+              display: 'flex',
+              width: { xs: '100%', sm: 220, md: 240 },
+              justifyContent: { xs: 'center', sm: 'flex-end' },
+              flexShrink: 0,
+              minHeight: 1,
+            }}
+          >
+            {action || <Box sx={{ width: { sm: 1 } }} />}
+          </Box>
         </Toolbar>
       </AppBar>
       {menu && (

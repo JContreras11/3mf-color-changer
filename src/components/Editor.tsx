@@ -1,13 +1,26 @@
+import ThreeDRotationRoundedIcon from '@mui/icons-material/ThreeDRotationRounded';
+import VideocamRoundedIcon from '@mui/icons-material/VideocamRounded';
+import ZoomInRoundedIcon from '@mui/icons-material/ZoomInRounded';
+import ZoomOutRoundedIcon from '@mui/icons-material/ZoomOutRounded';
 import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
 import CircularProgress from '@mui/material/CircularProgress';
+import IconButton from '@mui/material/IconButton';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
-import { enqueueSnackbar } from 'notistack';
+import { alpha } from '@mui/material/styles';
 import { ThreeEvent } from '@react-three/fiber';
+import { enqueueSnackbar } from 'notistack';
 import React, { useEffect } from 'react';
-import { useLoaderData, useLocation } from 'react-router-dom';
+import { useLoaderData, useLocation, useNavigate } from 'react-router-dom';
 import * as THREE from 'three';
 
+import {
+  getCapFamily,
+  getCapFamilyLabel,
+  getSelectedAddonId,
+  TRUCKER_ADDON_OPTIONS,
+} from '../etc/designCatalog';
 import exportFileJob from '../jobs/exportFile';
 import applyRasterOverlay from '../utils/threejs/applyRasterOverlay';
 import changeFaceColor from '../utils/threejs/changeFaceColor';
@@ -21,13 +34,19 @@ import {
   getRasterOverlayPlacement,
 } from '../utils/threejs/rasterOverlayPlacement';
 import { useJobContext } from './JobProvider';
-import ModeSelector, { Mode } from './ModeSelector';
+import ModeSelector, { DesignPanel, Mode } from './ModeSelector';
 import OverlayBrushPanel from './OverlayBrushPanel';
 import PermanentDrawer from './PermanentDrawer';
-import ThreeJsCanvas from './threeJs/Canvas';
+import ThreeJsCanvas, { ThreeJsCanvasHandle } from './threeJs/Canvas';
 import useFile from './threeJs/useFile';
 
 const BRAND_TITLE = 'CustomCaps';
+const DEFAULT_IMAGE_ROTATION = 0;
+const DEFAULT_IMAGE_SIZE = 30;
+const DEFAULT_TEXT = 'Text';
+const DEFAULT_TEXT_ROTATION = 0;
+const DEFAULT_TEXT_SIZE = 24;
+const DEFAULT_WORKING_COLOR = '#f00';
 
 type GhostOverlay = {
   camera: THREE.Camera;
@@ -61,6 +80,7 @@ export type Settings = {
   workingColor?: string;
   mode?: Mode;
 };
+
 type Props = {
   onSettingsChange?: (settings: Settings) => void;
 };
@@ -68,6 +88,7 @@ type Props = {
 export default function Editor({ onSettingsChange }: Props) {
   const settings = useLoaderData() as Settings;
   const location = useLocation();
+  const navigate = useNavigate();
   const searchParams = new URLSearchParams(location.search);
   const file = location.state?.file || searchParams.get('example');
   const { addJob } = useJobContext();
@@ -77,38 +98,63 @@ export default function Editor({ onSettingsChange }: Props) {
     return null;
   }
 
+  const initialMode = settings?.mode || 'mesh';
+  const initialWorkingColor = settings?.workingColor || DEFAULT_WORKING_COLOR;
+
   const [object, , fileState] = useFile(file);
-  const [mode, setMode] = React.useState<Mode>(settings?.mode || 'mesh');
+  const [mode, setMode] = React.useState<Mode>(initialMode);
+  const [activePanel, setActivePanel] = React.useState<DesignPanel>(
+    getDesignPanelFromMode(initialMode)
+  );
   const [workingColor, setWorkingColor] = React.useState<string>(
-    settings?.workingColor || '#f00'
+    initialWorkingColor
   );
   const [imageCanvas, setImageCanvas] = React.useState<HTMLCanvasElement | null>(
     null
   );
   const [imageFile, setImageFile] = React.useState<File | null>(null);
   const [imageName, setImageName] = React.useState<string>();
-  const [imageSize, setImageSize] = React.useState(30);
-  const [imageRotation, setImageRotation] = React.useState(0);
+  const [imageSize, setImageSize] = React.useState(DEFAULT_IMAGE_SIZE);
+  const [imageRotation, setImageRotation] =
+    React.useState(DEFAULT_IMAGE_ROTATION);
   const [imagePreviewUrl, setImagePreviewUrl] = React.useState<string | null>(
     null
   );
-  const [textValue, setTextValue] = React.useState('Text');
-  const [textSize, setTextSize] = React.useState(24);
-  const [textRotation, setTextRotation] = React.useState(0);
+  const [textValue, setTextValue] = React.useState(DEFAULT_TEXT);
+  const [textSize, setTextSize] = React.useState(DEFAULT_TEXT_SIZE);
+  const [textRotation, setTextRotation] =
+    React.useState(DEFAULT_TEXT_ROTATION);
   const [ghostOverlay, setGhostOverlay] = React.useState<GhostOverlay | null>(
     null
   );
   const [isSceneReady, setIsSceneReady] = React.useState(false);
   const [, setSceneRevision] = React.useState(0);
+  const canvasControlsRef = React.useRef<ThreeJsCanvasHandle | null>(null);
   const editorRef = React.useRef<HTMLDivElement>(null);
   const handleModelReady = React.useCallback(() => {
     setIsSceneReady(true);
   }, []);
+  const capFamily = React.useMemo(() => getCapFamily(file), [file]);
+  const capFamilyLabel = React.useMemo(
+    () => getCapFamilyLabel(capFamily),
+    [capFamily]
+  );
+  const selectedAddonId = React.useMemo(
+    () => getSelectedAddonId(file),
+    [file]
+  );
+  const canUseCuratedAddons =
+    capFamily === 'trucker' && typeof file === 'string';
   const isEditorLoading = fileState.isLoading || (!!object && !isSceneReady);
-  const loadingTitle = object ? 'Preparing your workspace' : 'Loading 3MF file';
+  const loadingTitle = object ? 'Preparing your atelier view' : 'Loading 3MF file';
   const loadingDescription = object
-    ? 'Almost there — enabling tools as soon as the model is mounted.'
+    ? 'Almost there — controls unlock as soon as the model finishes mounting in the canvas.'
     : 'Some 3MF files take a few seconds to unzip and parse. The editor will unlock automatically.';
+  const addonPanelDescription = canUseCuratedAddons
+    ? `Swap between curated ${capFamilyLabel} accessory variations. Selecting one reloads the matching 3MF directly in the browser.`
+    : capFamily === 'custom'
+      ? 'Curated accessory variations are currently available for the prepared Trucker Cap base. Select that silhouette from Base to explore add-ons.'
+      : `Accessory-ready 3MF variations are currently prepared for the Trucker Cap base. ${capFamilyLabel} add-ons will arrive in a future version.`;
   const textCanvas = React.useMemo(() => {
     try {
       return createTextCanvas(textValue, workingColor);
@@ -128,7 +174,7 @@ export default function Editor({ onSettingsChange }: Props) {
         workingColor,
       });
     }
-  }, [mode, workingColor]);
+  }, [mode, onSettingsChange, workingColor]);
 
   useEffect(() => {
     setIsSceneReady(false);
@@ -150,10 +196,10 @@ export default function Editor({ onSettingsChange }: Props) {
   }, [imageFile]);
 
   useEffect(() => {
-    if (mode !== 'image' && mode !== 'text') {
+    if (activePanel === 'objects') {
       setGhostOverlay(null);
     }
-  }, [mode]);
+  }, [activePanel]);
 
   useEffect(() => {
     if (fileState.error) {
@@ -161,8 +207,48 @@ export default function Editor({ onSettingsChange }: Props) {
     }
   }, [fileState.error]);
 
+  const handlePanelChange = React.useCallback((panel: DesignPanel) => {
+    setActivePanel(panel);
+    setGhostOverlay(null);
+    setMode((currentMode) => {
+      if (panel === 'graphics') {
+        return 'image';
+      }
+
+      if (panel === 'text') {
+        return 'text';
+      }
+
+      if (panel === 'materials') {
+        return currentMode === 'mesh' ||
+          currentMode === 'triangle' ||
+          currentMode === 'select_color'
+          ? currentMode
+          : 'mesh';
+      }
+
+      return currentMode;
+    });
+  }, []);
+
+  const handleModeChange = React.useCallback((newMode: Mode) => {
+    setMode(newMode);
+
+    if (newMode === 'image') {
+      setActivePanel('graphics');
+      return;
+    }
+
+    if (newMode === 'text') {
+      setActivePanel('text');
+      return;
+    }
+
+    setActivePanel('materials');
+  }, []);
+
   const handleSelect = (e: ThreeEvent<MouseEvent>) => {
-    if (isEditorLoading) {
+    if (isEditorLoading || activePanel === 'objects') {
       return;
     }
 
@@ -179,16 +265,15 @@ export default function Editor({ onSettingsChange }: Props) {
     }
   };
 
-  const handleExport = async () => {
+  const handleExport = React.useCallback(async () => {
     if (!object || isEditorLoading) {
       return;
     }
 
-    addJob(exportFileJob(file, object!));
-  };
+    addJob(exportFileJob(file, object));
+  }, [addJob, file, isEditorLoading, object]);
 
   const handleMeshColorChange = (uuid, color: string) => {
-    // TODO: Debounce - no need to re-render the mesh for every color change (e.g. when dragging the color picker)
     object?.traverse((child) => {
       if (child.uuid !== uuid) {
         return;
@@ -281,23 +366,24 @@ export default function Editor({ onSettingsChange }: Props) {
     }
   };
 
-  const handleModeChange = (newMode) => {
-    setMode(newMode);
-  };
-
-  const handleImageFileChange = async (file: File) => {
+  const handleImageFileChange = async (uploadedFile: File) => {
     try {
-      const canvas = await createImageCanvas(file);
+      const canvas = await createImageCanvas(uploadedFile);
       setImageCanvas(canvas);
-      setImageFile(file);
-      setImageName(file.name);
+      setImageFile(uploadedFile);
+      setImageName(uploadedFile.name);
     } catch (error) {
       enqueueSnackbar(error.toString(), { variant: 'error' });
     }
   };
 
   const handlePointerMoveModel = (e: ThreeEvent<PointerEvent>) => {
-    if (isEditorLoading) {
+    if (
+      isEditorLoading ||
+      activePanel === 'objects' ||
+      (activePanel === 'graphics' && mode !== 'image') ||
+      (activePanel === 'text' && mode !== 'text')
+    ) {
       setGhostOverlay(null);
       return;
     }
@@ -332,7 +418,7 @@ export default function Editor({ onSettingsChange }: Props) {
   };
 
   const handlePointerOverModel = () => {
-    if (isEditorLoading) {
+    if (isEditorLoading || activePanel === 'objects') {
       return;
     }
 
@@ -349,15 +435,95 @@ export default function Editor({ onSettingsChange }: Props) {
     setGhostOverlay(null);
   };
 
+  const handleResetMaterials = React.useCallback(() => {
+    setWorkingColor(initialWorkingColor);
+    handleModeChange('mesh');
+  }, [handleModeChange, initialWorkingColor]);
+
+  const handleResetGraphics = React.useCallback(() => {
+    setImageCanvas(null);
+    setImageFile(null);
+    setImageName(undefined);
+    setImageSize(DEFAULT_IMAGE_SIZE);
+    setImageRotation(DEFAULT_IMAGE_ROTATION);
+    setGhostOverlay(null);
+  }, []);
+
+  const handleApplyGraphics = React.useCallback(() => {
+    if (!imageCanvas) {
+      enqueueSnackbar('Upload a graphic first.', { variant: 'info' });
+      return;
+    }
+
+    enqueueSnackbar('Click the cap surface to place your graphic.', {
+      variant: 'info',
+    });
+  }, [imageCanvas]);
+
+  const handleResetText = React.useCallback(() => {
+    setTextValue(DEFAULT_TEXT);
+    setTextSize(DEFAULT_TEXT_SIZE);
+    setTextRotation(DEFAULT_TEXT_ROTATION);
+    setGhostOverlay(null);
+  }, []);
+
+  const handleApplyText = React.useCallback(() => {
+    if (!textValue.trim()) {
+      enqueueSnackbar('Write some text first.', { variant: 'warning' });
+      return;
+    }
+
+    enqueueSnackbar('Click the cap surface to place your text.', {
+      variant: 'info',
+    });
+  }, [textValue]);
+
+  const handleAddonSelect = React.useCallback(
+    (option: (typeof TRUCKER_ADDON_OPTIONS)[number]) => {
+      if (isEditorLoading) {
+        return;
+      }
+
+      if (!canUseCuratedAddons) {
+        enqueueSnackbar(
+          capFamily === 'custom'
+            ? 'Curated add-ons are available for the prepared Trucker Cap base.'
+            : `${capFamilyLabel} add-ons are coming in a future version.`,
+          {
+            variant: 'info',
+          }
+        );
+        return;
+      }
+
+      if (selectedAddonId === option.id) {
+        return;
+      }
+
+      navigate('/editor?example=' + encodeURIComponent(option.path));
+    },
+    [
+      canUseCuratedAddons,
+      capFamily,
+      capFamilyLabel,
+      isEditorLoading,
+      navigate,
+      selectedAddonId,
+    ]
+  );
+
   const previewSource: OverlayPreviewSource | null =
-    mode === 'image' && imageCanvas && imagePreviewUrl
+    activePanel === 'graphics' &&
+    mode === 'image' &&
+    imageCanvas &&
+    imagePreviewUrl
       ? {
           canvas: imageCanvas,
           rotationDegrees: imageRotation,
           size: imageSize,
           url: imagePreviewUrl,
         }
-      : mode === 'text' && textCanvas && textPreviewUrl
+      : activePanel === 'text' && mode === 'text' && textCanvas && textPreviewUrl
         ? {
             canvas: textCanvas,
             rotationDegrees: textRotation,
@@ -381,46 +547,59 @@ export default function Editor({ onSettingsChange }: Props) {
         })
       : null;
 
+  const exportAction = (
+    <Button
+      disabled={!object || isEditorLoading}
+      onClick={handleExport}
+      sx={{
+        px: { xs: 2.75, md: 3.5 },
+        py: 1.35,
+        borderRadius: '999px',
+        background: 'linear-gradient(145deg, #0058bc 0%, #0f6fe3 100%)',
+        color: '#ffffff',
+        fontFamily: '"Manrope", "Inter", sans-serif',
+        fontSize: { xs: 14, md: 15 },
+        fontWeight: 800,
+        letterSpacing: '-0.02em',
+        textTransform: 'none',
+        boxShadow: '0 16px 28px rgba(0, 88, 188, 0.22)',
+        '&:hover': {
+          background: 'linear-gradient(145deg, #004da6 0%, #0c67d6 100%)',
+        },
+      }}
+    >
+      Export .3MF
+    </Button>
+  );
+
   return (
-    <PermanentDrawer title={BRAND_TITLE}>
-      <Box component="div" sx={{ position: 'relative', height: '100%' }}>
+    <PermanentDrawer title={BRAND_TITLE} action={exportAction}>
+      <Box
+        component="div"
+        sx={{
+          position: 'relative',
+          height: '100%',
+          p: { xs: 2, md: 3 },
+          display: 'grid',
+          gridTemplateColumns: { xs: '1fr', lg: 'minmax(0, 1fr) 390px', xl: 'minmax(0, 1fr) 420px' },
+          gridTemplateRows: { xs: 'minmax(420px, 1fr) auto', lg: '1fr' },
+          gap: { xs: 2, md: 3 },
+          overflow: { xs: 'auto', lg: 'hidden' },
+        }}
+      >
         <ModeSelector
-          color={workingColor}
+          activePanel={activePanel}
           disabled={isEditorLoading}
-          mode={mode}
-          onColorChange={handleWorkingColorChange}
-          onExport={handleExport}
-          onModeChange={handleModeChange}
+          onPanelChange={handlePanelChange}
           sx={{
             position: 'absolute',
-            top: 5,
-            left: 5,
-            backgroundColor: 'transparent',
-            zIndex: 1,
-            '& .MuiButtonBase-root': {
-              backgroundColor: 'white',
-            },
-            '& .MuiButtonBase-root: hover': {
-              backgroundColor: '#efefef',
-            },
+            left: { xs: 12, md: 20, xl: 28 },
+            top: { xs: 12, sm: '50%' },
+            transform: { xs: 'none', sm: 'translateY(-50%)' },
+            zIndex: 6,
           }}
         />
-        <OverlayBrushPanel
-          disabled={isEditorLoading}
-          mode={mode}
-          imageName={imageName}
-          imageRotation={imageRotation}
-          imageSize={imageSize}
-          onImageRotationChange={setImageRotation}
-          onImageSelect={handleImageFileChange}
-          onImageSizeChange={setImageSize}
-          onTextChange={setTextValue}
-          onTextRotationChange={setTextRotation}
-          onTextSizeChange={setTextSize}
-          text={textValue}
-          textRotation={textRotation}
-          textSize={textSize}
-        />
+
         {overlayGhostPreview && previewSource && (
           <>
             <Box
@@ -507,91 +686,251 @@ export default function Editor({ onSettingsChange }: Props) {
             </Box>
           </>
         )}
-        <div
-          ref={editorRef}
-          style={{
-            height: '100%',
-            pointerEvents: isEditorLoading ? 'none' : 'auto',
-          }}
-        >
-          {object && (
-            <ThreeJsCanvas
-              continuousPaint={
-                mode === 'mesh' || mode === 'triangle'
-              }
-              geometry={object}
-              onModelReady={handleModelReady}
-              onSelect={handleSelect}
-              onPointerMoveModel={handlePointerMoveModel}
-              onPointerOverModel={handlePointerOverModel}
-              onPointerOutModel={handlePointerOutModel}
-            />
-          )}
-        </div>
+
         <Box
-          component="div"
-          aria-busy={isEditorLoading}
-          aria-live="polite"
           sx={{
-            position: 'absolute',
-            inset: 0,
-            display: 'grid',
-            placeItems: 'center',
-            opacity: isEditorLoading ? 1 : 0,
-            pointerEvents: 'none',
-            transition: 'opacity 180ms ease',
-            zIndex: isEditorLoading ? 5 : -1,
-            background:
-              'radial-gradient(circle at top, rgba(0,88,188,0.08), transparent 38%), rgba(248,249,250,0.72)',
-            backdropFilter: isEditorLoading ? 'blur(10px)' : 'blur(0px)',
+            position: 'relative',
+            minWidth: 0,
+            minHeight: { xs: 420, lg: 0 },
+            pl: { xs: 0, sm: 9.5, md: 11 },
           }}
         >
-          <Stack
-            spacing={2}
-            alignItems="center"
+          <Box
             sx={{
-              width: 'min(460px, calc(100vw - 48px))',
-              px: { xs: 3, md: 4 },
-              py: { xs: 3, md: 3.5 },
-              borderRadius: '28px',
-              bgcolor: 'rgba(255,255,255,0.88)',
-              boxShadow: '0 24px 80px rgba(15, 23, 42, 0.10)',
-              border: '1px solid rgba(0, 88, 188, 0.12)',
-              textAlign: 'center',
+              position: 'relative',
+              height: '100%',
+              overflow: 'hidden',
+              borderRadius: { xs: '32px', md: '40px' },
+              border: `1px solid ${alpha('#d8e2ff', 0.78)}`,
+              boxShadow: '0 30px 90px rgba(15, 23, 42, 0.08)',
+              background:
+                'radial-gradient(circle at top, rgba(255,255,255,0.98) 0%, rgba(244,246,249,0.96) 46%, rgba(233,238,244,0.92) 100%)',
             }}
           >
-            <CircularProgress
-              size={44}
-              thickness={4}
-              sx={{ color: '#0058bc' }}
-            />
-            <Typography
+            <Box
               sx={{
-                fontFamily: '"Manrope", "Inter", sans-serif',
-                fontSize: { xs: 24, md: 30 },
-                fontWeight: 800,
-                letterSpacing: '-0.04em',
-                color: '#111827',
-              }}
-            >
-              {loadingTitle}
-            </Typography>
-            <Typography
-              sx={{
-                maxWidth: 360,
+                position: 'absolute',
+                top: 24,
+                right: 24,
+                zIndex: 2,
+                px: 2,
+                py: 1,
+                borderRadius: '999px',
+                bgcolor: alpha('#ffffff', 0.88),
                 color: '#4b5563',
-                fontSize: { xs: 14, md: 15 },
-                lineHeight: 1.6,
+                fontSize: 12,
+                fontWeight: 800,
+                letterSpacing: '0.22em',
+                textTransform: 'uppercase',
+                boxShadow: '0 12px 24px rgba(15, 23, 42, 0.06)',
               }}
             >
-              {loadingDescription}
-            </Typography>
-          </Stack>
+              Direct 3MF Preview
+            </Box>
+
+            <Box
+              ref={editorRef}
+              sx={{
+                position: 'relative',
+                height: '100%',
+                pointerEvents: isEditorLoading ? 'none' : 'auto',
+                '& canvas': {
+                  outline: 'none',
+                },
+              }}
+            >
+              {object && (
+                <ThreeJsCanvas
+                  ref={canvasControlsRef}
+                  continuousPaint={activePanel === 'materials' && (mode === 'mesh' || mode === 'triangle')}
+                  geometry={object}
+                  onModelReady={handleModelReady}
+                  onSelect={handleSelect}
+                  onPointerMoveModel={handlePointerMoveModel}
+                  onPointerOutModel={handlePointerOutModel}
+                  onPointerOverModel={handlePointerOverModel}
+                  showGroundGrid={false}
+                  showViewCube={false}
+                />
+              )}
+            </Box>
+
+            <Stack
+              direction="row"
+              spacing={1}
+              divider={
+                <Box
+                  sx={{
+                    width: 1,
+                    alignSelf: 'stretch',
+                    bgcolor: alpha('#c1c6d7', 0.5),
+                  }}
+                />
+              }
+              sx={{
+                position: 'absolute',
+                bottom: 22,
+                left: '50%',
+                transform: 'translateX(-50%)',
+                zIndex: 2,
+                px: 1.25,
+                py: 1,
+                borderRadius: '999px',
+                bgcolor: alpha('#ffffff', 0.86),
+                backdropFilter: 'blur(16px)',
+                boxShadow: '0 18px 36px rgba(15, 23, 42, 0.10)',
+              }}
+            >
+              <IconButton
+                disabled={!object || isEditorLoading}
+                onClick={() => canvasControlsRef.current?.resetView()}
+                sx={floatingControlButtonSx}
+              >
+                <VideocamRoundedIcon />
+              </IconButton>
+              <IconButton
+                disabled={!object || isEditorLoading}
+                onClick={() => canvasControlsRef.current?.orbitLeft()}
+                sx={floatingControlButtonSx}
+              >
+                <ThreeDRotationRoundedIcon />
+              </IconButton>
+              <IconButton
+                disabled={!object || isEditorLoading}
+                onClick={() => canvasControlsRef.current?.zoomIn()}
+                sx={floatingControlButtonSx}
+              >
+                <ZoomInRoundedIcon />
+              </IconButton>
+              <IconButton
+                disabled={!object || isEditorLoading}
+                onClick={() => canvasControlsRef.current?.zoomOut()}
+                sx={floatingControlButtonSx}
+              >
+                <ZoomOutRoundedIcon />
+              </IconButton>
+            </Stack>
+
+            <Box
+              component="div"
+              aria-busy={isEditorLoading}
+              aria-live="polite"
+              sx={{
+                position: 'absolute',
+                inset: 0,
+                display: 'grid',
+                placeItems: 'center',
+                opacity: isEditorLoading ? 1 : 0,
+                pointerEvents: 'none',
+                transition: 'opacity 180ms ease',
+                zIndex: isEditorLoading ? 5 : -1,
+                background:
+                  'radial-gradient(circle at top, rgba(0,88,188,0.08), transparent 38%), rgba(248,249,250,0.72)',
+                backdropFilter: isEditorLoading ? 'blur(10px)' : 'blur(0px)',
+              }}
+            >
+              <Stack
+                spacing={2}
+                alignItems="center"
+                sx={{
+                  width: 'min(460px, calc(100vw - 48px))',
+                  px: { xs: 3, md: 4 },
+                  py: { xs: 3, md: 3.5 },
+                  borderRadius: '28px',
+                  bgcolor: 'rgba(255,255,255,0.88)',
+                  boxShadow: '0 24px 80px rgba(15, 23, 42, 0.10)',
+                  border: '1px solid rgba(0, 88, 188, 0.12)',
+                  textAlign: 'center',
+                }}
+              >
+                <CircularProgress
+                  size={44}
+                  thickness={4}
+                  sx={{ color: '#0058bc' }}
+                />
+                <Typography
+                  sx={{
+                    fontFamily: '"Manrope", "Inter", sans-serif',
+                    fontSize: { xs: 24, md: 30 },
+                    fontWeight: 800,
+                    letterSpacing: '-0.04em',
+                    color: '#111827',
+                  }}
+                >
+                  {loadingTitle}
+                </Typography>
+                <Typography
+                  sx={{
+                    maxWidth: 360,
+                    color: '#4b5563',
+                    fontSize: { xs: 14, md: 15 },
+                    lineHeight: 1.6,
+                  }}
+                >
+                  {loadingDescription}
+                </Typography>
+              </Stack>
+            </Box>
+          </Box>
+        </Box>
+
+        <Box sx={{ minWidth: 0, minHeight: { xs: 480, lg: 0 } }}>
+          <OverlayBrushPanel
+            activePanel={activePanel}
+            addonOptions={TRUCKER_ADDON_OPTIONS}
+            addonPanelDescription={addonPanelDescription}
+            addonsEnabled={canUseCuratedAddons}
+            color={workingColor}
+            disabled={isEditorLoading}
+            imageName={imageName}
+            imageRotation={imageRotation}
+            imageSize={imageSize}
+            mode={mode}
+            onAddonSelect={handleAddonSelect}
+            onApplyGraphics={handleApplyGraphics}
+            onApplyText={handleApplyText}
+            onColorChange={handleWorkingColorChange}
+            onImageRotationChange={setImageRotation}
+            onImageSelect={handleImageFileChange}
+            onImageSizeChange={setImageSize}
+            onModeChange={handleModeChange}
+            onResetGraphics={handleResetGraphics}
+            onResetMaterials={handleResetMaterials}
+            onResetText={handleResetText}
+            onTextChange={setTextValue}
+            onTextRotationChange={setTextRotation}
+            onTextSizeChange={setTextSize}
+            selectedAddonId={canUseCuratedAddons ? selectedAddonId : null}
+            text={textValue}
+            textRotation={textRotation}
+            textSize={textSize}
+          />
         </Box>
       </Box>
     </PermanentDrawer>
   );
 }
+
+function getDesignPanelFromMode(mode: Mode): DesignPanel {
+  if (mode === 'image') {
+    return 'graphics';
+  }
+
+  if (mode === 'text') {
+    return 'text';
+  }
+
+  return 'materials';
+}
+
+const floatingControlButtonSx = {
+  color: '#374151',
+  width: 44,
+  height: 44,
+  '&:hover': {
+    bgcolor: alpha('#ffffff', 0.92),
+  },
+};
 
 function getOverlayGhostPreview({
   bounds,
@@ -634,7 +973,11 @@ function getOverlayGhostPreview({
     projectWorldPoint(root.localToWorld(cornerRoot.clone()), camera, bounds)
   );
 
-  if (projectedCorners.some((point) => !Number.isFinite(point.x) || !Number.isFinite(point.y))) {
+  if (
+    projectedCorners.some(
+      (point) => !Number.isFinite(point.x) || !Number.isFinite(point.y)
+    )
+  ) {
     return null;
   }
 

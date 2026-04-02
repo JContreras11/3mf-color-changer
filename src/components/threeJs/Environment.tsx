@@ -3,10 +3,12 @@ import React, { memo } from 'react';
 
 type Props = {
   direction?: [number, number, number];
+  showGrid?: boolean;
 };
 
 export const Environment = memo(function Environment({
   direction = [5, 5, 5],
+  showGrid = true,
 }: Props) {
   /* eslint-disable react/no-unknown-property */
   return (
@@ -36,7 +38,7 @@ export const Environment = memo(function Environment({
         shadow-mapSize={128}
         castShadow
       />
-      <Grid infiniteGrid={true} sectionColor="#CCCCCC" />
+      {showGrid && <Grid infiniteGrid={true} sectionColor="#CCCCCC" />}
     </>
   );
   /* eslint-enable react/no-unknown-property */

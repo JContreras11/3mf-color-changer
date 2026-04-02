@@ -1,20 +1,14 @@
-import ColorizeIcon from '@mui/icons-material/Colorize';
-import CreateIcon from '@mui/icons-material/Create';
-import FileDownloadIcon from '@mui/icons-material/FileDownload';
-import FormatPaintIcon from '@mui/icons-material/FormatPaint';
-import ImageIcon from '@mui/icons-material/Image';
-import PaletteIcon from '@mui/icons-material/Palette';
-import TextFieldsIcon from '@mui/icons-material/TextFields';
+import ExtensionRoundedIcon from '@mui/icons-material/ExtensionRounded';
+import ImageRoundedIcon from '@mui/icons-material/ImageRounded';
+import PaletteOutlinedIcon from '@mui/icons-material/PaletteOutlined';
+import TextFieldsRoundedIcon from '@mui/icons-material/TextFieldsRounded';
 import type { SxProps } from '@mui/material';
 import Box from '@mui/material/Box';
-import ButtonGroup from '@mui/material/ButtonGroup';
-import IconButton from '@mui/material/IconButton';
-import Popover from '@mui/material/Popover';
+import ButtonBase from '@mui/material/ButtonBase';
 import Tooltip from '@mui/material/Tooltip';
+import Typography from '@mui/material/Typography';
+import { alpha } from '@mui/material/styles';
 import React from 'react';
-import { HexColorPicker } from 'react-colorful';
-
-import UseNewModelButton from './ModeSelector/UseNewModelButton';
 
 export type Mode =
   | 'mesh'
@@ -22,190 +16,138 @@ export type Mode =
   | 'select_color'
   | 'text'
   | 'image';
+
+export type DesignPanel =
+  | 'materials'
+  | 'graphics'
+  | 'objects'
+  | 'text';
+
 type Props = {
-  color: string;
+  activePanel: DesignPanel;
   disabled?: boolean;
-  mode: Mode;
-  onColorChange: (color: string) => void;
-  onExport: () => void;
-  onModeChange: (mode: Mode) => void;
+  onPanelChange: (panel: DesignPanel) => void;
   sx?: SxProps;
 };
 
-const defaultColors = [
-  '#d53e4f',
-  '#f46d43',
-  '#fdae61',
-  '#fee08b',
-  '#e6f598',
-  '#abdda4',
-  '#66c2a5',
-  '#3288bd',
-  '#ffffff',
-];
+const panelItems = [
+  {
+    id: 'materials',
+    label: 'Materials',
+    icon: PaletteOutlinedIcon,
+    tooltip: 'Paint the cap, edit color details, or sample a color from the model.',
+  },
+  {
+    id: 'graphics',
+    label: 'Graphics',
+    icon: ImageRoundedIcon,
+    tooltip: 'Upload logos or images and place them on the cap.',
+  },
+  {
+    id: 'objects',
+    label: 'Objects',
+    icon: ExtensionRoundedIcon,
+    tooltip: 'Swap into curated 3MF accessory variations for this silhouette.',
+  },
+  {
+    id: 'text',
+    label: 'Text',
+    icon: TextFieldsRoundedIcon,
+    tooltip: 'Add editable text to the selected surface.',
+  },
+] as const satisfies readonly {
+  icon: typeof PaletteOutlinedIcon;
+  id: DesignPanel;
+  label: string;
+  tooltip: string;
+}[];
 
 export default function ModeSelector({
-  color,
+  activePanel,
   disabled = false,
-  mode,
-  onColorChange,
-  onExport,
-  onModeChange,
+  onPanelChange,
   sx,
 }: Props) {
-  const [showColorPicker, setShowColorPicker] = React.useState(false);
-  const [colorPickerAnchorEl, setColorPickerAnchorEl] =
-    React.useState<HTMLButtonElement>();
-
-  React.useEffect(() => {
-    if (disabled) {
-      setShowColorPicker(false);
-    }
-  }, [disabled]);
-
-  const handleModeClick = (newMode: Mode) => () => onModeChange(newMode);
-  const handleColorChange = (newColor) => onColorChange(newColor);
-  const handleExportClick = onExport;
-
-  const style = {
-    border: 1,
-    borderColor: '#ccc',
-    borderRadius: 2,
-    borderStyle: 'solid',
-    m: 0.25,
-  };
-  const selectedStyle = {
-    ...style,
-    border: 2,
-    borderColor: 'primary.main',
-  };
-
   return (
-    <ButtonGroup
-      orientation="vertical"
-      aria-label="vertical outlined button group"
-      sx={sx}
+    <Box
+      sx={{
+        width: { xs: 82, md: 92 },
+        p: { xs: 1.25, md: 1.5 },
+        borderRadius: { xs: '28px', md: '32px' },
+        bgcolor: alpha('#ffffff', 0.86),
+        backdropFilter: 'blur(20px)',
+        boxShadow: '0 24px 64px rgba(0, 88, 188, 0.10)',
+        border: `1px solid ${alpha('#d8e2ff', 0.72)}`,
+        display: 'flex',
+        flexDirection: 'column',
+        gap: { xs: 1.25, md: 1.5 },
+        ...sx,
+      }}
     >
-      <Tooltip
-        title="Select the mesh painting tool to paint whole objects."
-        placement="right"
-      >
-        <IconButton
-          disabled={disabled}
-          onClick={handleModeClick('mesh')}
-          sx={mode === 'mesh' ? selectedStyle : style}
-        >
-          <FormatPaintIcon />
-        </IconButton>
-      </Tooltip>
+      {panelItems.map((item) => {
+        const active = item.id === activePanel;
+        const Icon = item.icon;
 
-      <Tooltip
-        title="Select the triangle painting tool to paint the smallest components of your model."
-        placement="right"
-      >
-        <IconButton
-          disabled={disabled}
-          onClick={handleModeClick('triangle')}
-          sx={mode === 'triangle' ? selectedStyle : style}
-        >
-          <CreateIcon />
-        </IconButton>
-      </Tooltip>
-
-      <Tooltip title="Select the painting color" placement="right">
-        <IconButton
-          disabled={disabled}
-          sx={{
-            ...style,
-          }}
-          onClick={(event) => {
-            setColorPickerAnchorEl(event?.currentTarget);
-            setShowColorPicker(!showColorPicker);
-          }}
-        >
-          <PaletteIcon
-            sx={{
-              borderBottom: 6,
-              borderBottomColor: color,
-            }}
-          />
-        </IconButton>
-      </Tooltip>
-
-      <Tooltip title="Select the color from a model" placement="right">
-        <IconButton
-          disabled={disabled}
-          onClick={handleModeClick('select_color')}
-          sx={mode === 'select_color' ? selectedStyle : style}
-        >
-          <ColorizeIcon />
-        </IconButton>
-      </Tooltip>
-
-      <Tooltip title="Add text on top of a solid" placement="right">
-        <IconButton
-          disabled={disabled}
-          onClick={handleModeClick('text')}
-          sx={mode === 'text' ? selectedStyle : style}
-        >
-          <TextFieldsIcon />
-        </IconButton>
-      </Tooltip>
-
-      <Tooltip title="Add an image on top of a solid" placement="right">
-        <IconButton
-          disabled={disabled}
-          onClick={handleModeClick('image')}
-          sx={mode === 'image' ? selectedStyle : style}
-        >
-          <ImageIcon />
-        </IconButton>
-      </Tooltip>
-
-      <UseNewModelButton buttonSx={{ ...style, mt: 5 }} />
-
-      <Tooltip title="Export your changes in a 3MF file" placement="right">
-        <IconButton disabled={disabled} onClick={handleExportClick} sx={style}>
-          <FileDownloadIcon />
-        </IconButton>
-      </Tooltip>
-
-      <Box component="div" sx={{ mt: 5 }} />
-      {defaultColors.map((d) => (
-        <Tooltip title="Set color" placement="right" key={d}>
-          <IconButton
-            disabled={disabled}
-            onClick={() => handleColorChange(d)}
-            sx={{ ...style, backgroundColor: d + ' !important', height: 40 }}
-          ></IconButton>
-        </Tooltip>
-      ))}
-
-      <Popover
-        open={!disabled && showColorPicker}
-        anchorEl={colorPickerAnchorEl}
-        onClose={() => setShowColorPicker(false)}
-        anchorOrigin={{
-          vertical: 'bottom',
-          horizontal: 'right',
-        }}
-        transformOrigin={{
-          vertical: 'top',
-          horizontal: 'left',
-        }}
-        slotProps={{
-          paper: {
-            style: {
-              backgroundColor: 'transparent',
-              boxShadow: 'none',
-            },
-          },
-        }}
-      >
-        <Box component="div" sx={{ m: 2 }}>
-          <HexColorPicker color={color} onChange={handleColorChange} />
-        </Box>
-      </Popover>
-    </ButtonGroup>
+        return (
+          <Tooltip
+            key={item.id}
+            title={item.tooltip}
+            placement="right"
+            disableInteractive
+          >
+            <ButtonBase
+              disabled={disabled}
+              onClick={() => onPanelChange(item.id)}
+              sx={{
+                borderRadius: '24px',
+                px: 0.5,
+                py: 1.25,
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 1,
+                transition:
+                  'transform 180ms ease, background-color 180ms ease, opacity 180ms ease',
+                opacity: disabled ? 0.5 : 1,
+                '&:hover': {
+                  transform: disabled ? 'none' : 'translateY(-1px)',
+                },
+              }}
+            >
+              <Box
+                sx={{
+                  width: { xs: 46, md: 52 },
+                  height: { xs: 46, md: 52 },
+                  borderRadius: '50%',
+                  display: 'grid',
+                  placeItems: 'center',
+                  background: active
+                    ? 'linear-gradient(145deg, #0058bc 0%, #0f6fe3 100%)'
+                    : alpha('#edf1f7', 0.95),
+                  color: active ? '#ffffff' : '#414755',
+                  boxShadow: active
+                    ? '0 18px 32px rgba(0, 88, 188, 0.24)'
+                    : 'inset 0 0 0 1px rgba(193, 198, 215, 0.28)',
+                }}
+              >
+                <Icon sx={{ fontSize: { xs: 22, md: 24 } }} />
+              </Box>
+              <Typography
+                sx={{
+                  fontSize: { xs: 9, md: 10 },
+                  fontWeight: active ? 800 : 600,
+                  letterSpacing: '0.24em',
+                  textTransform: 'uppercase',
+                  color: active ? '#0058bc' : alpha('#414755', 0.62),
+                  lineHeight: 1.4,
+                  textAlign: 'center',
+                }}
+              >
+                {item.label}
+              </Typography>
+            </ButtonBase>
+          </Tooltip>
+        );
+      })}
+    </Box>
   );
 }
