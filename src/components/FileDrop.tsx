@@ -7,13 +7,21 @@ import React from 'react';
 
 type Props = {
   children?: React.ReactNode;
+  disabled?: boolean;
+  onDisabledClick?: () => void;
   onDrop: (files: File[]) => void;
   sx?: SxProps;
 };
 
 const ACCEPTED_TYPES = ['.3mf', 'application/vnd.ms-3mfdocument'] as const;
 
-export default function FileDrop({ children, onDrop, sx }: Props) {
+export default function FileDrop({
+  children,
+  disabled = false,
+  onDisabledClick,
+  onDrop,
+  sx,
+}: Props) {
   const inputRef = React.useRef<HTMLInputElement | null>(null);
   const [isDragActive, setIsDragActive] = React.useState(false);
 
@@ -21,7 +29,7 @@ export default function FileDrop({ children, onDrop, sx }: Props) {
     (fileList: FileList | File[] | null | undefined) => {
       const files = Array.from(fileList || []);
 
-      if (!files.length) {
+      if (!files.length || disabled) {
         return;
       }
 
@@ -44,19 +52,25 @@ export default function FileDrop({ children, onDrop, sx }: Props) {
 
       onDrop([file]);
     },
-    [onDrop]
+    [disabled, onDrop]
   );
 
   const handleOpenPicker = React.useCallback(() => {
+    if (disabled) {
+      onDisabledClick?.();
+      return;
+    }
+
     inputRef.current?.click();
-  }, []);
+  }, [disabled, onDisabledClick]);
 
   const mergedSx = {
-    cursor: 'pointer',
+    cursor: disabled ? 'not-allowed' : 'pointer',
     borderStyle: 'dashed',
     borderWidth: 2,
     borderColor: '#aaa',
     p: 1,
+    opacity: disabled ? 0.72 : 1,
     backgroundColor: isDragActive ? '#eee' : '#fff',
     ...sx,
   };
@@ -65,10 +79,15 @@ export default function FileDrop({ children, onDrop, sx }: Props) {
     <Box
       component="div"
       role="button"
-      tabIndex={0}
+      aria-disabled={disabled}
+      tabIndex={disabled ? -1 : 0}
       sx={mergedSx}
       onClick={handleOpenPicker}
       onKeyDown={(event) => {
+        if (disabled) {
+          return;
+        }
+
         if (event.key === 'Enter' || event.key === ' ') {
           event.preventDefault();
           handleOpenPicker();
@@ -76,14 +95,28 @@ export default function FileDrop({ children, onDrop, sx }: Props) {
       }}
       onDragEnter={(event) => {
         event.preventDefault();
+
+        if (disabled) {
+          return;
+        }
+
         setIsDragActive(true);
       }}
       onDragOver={(event) => {
         event.preventDefault();
+
+        if (disabled) {
+          return;
+        }
+
         setIsDragActive(true);
       }}
       onDragLeave={(event) => {
         event.preventDefault();
+
+        if (disabled) {
+          return;
+        }
 
         if (event.currentTarget === event.target) {
           setIsDragActive(false);
@@ -92,12 +125,19 @@ export default function FileDrop({ children, onDrop, sx }: Props) {
       onDrop={(event) => {
         event.preventDefault();
         setIsDragActive(false);
+
+        if (disabled) {
+          onDisabledClick?.();
+          return;
+        }
+
         validateFiles(event.dataTransfer?.files);
       }}
     >
       <input
         ref={inputRef}
         hidden
+        disabled={disabled}
         type="file"
         accept={ACCEPTED_TYPES.join(',')}
         onChange={(event) => {

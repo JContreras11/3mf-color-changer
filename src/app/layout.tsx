@@ -14,7 +14,7 @@ const roboto = Roboto({
 });
 
 export const metadata: Metadata = {
-  title: 'CustomCaps',
+  title: 'Customize your caps',
   description: 'Customize and export printable 3MF cap models.',
 };
 

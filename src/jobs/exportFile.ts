@@ -6,37 +6,65 @@ import ProgressPromise from '../utils/ProgressPromise';
 
 export const TYPE = 'exportFile';
 
+export type GeneratedExportFile = {
+  baseName: string;
+  blob: Blob;
+  downloadName: string;
+};
+
 export default function exportFileJob(
   fileOrPath: string | File,
   object: THREE.Object3D
 ): Job {
   return {
     type: TYPE,
-    label: `Exporting file`,
+    label: 'Exporting file',
     progressVariant: 'indeterminate',
     promise: new ProgressPromise(async (resolve, reject) => {
       try {
-        const blob = await exportSceneTo3mf(object!, getFileBaseName(fileOrPath));
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
+        const exportFile = await generateExportFile(fileOrPath, object);
 
-        link.href = url;
-        link.download = getDownloadName(fileOrPath);
-        link.click();
+        downloadExportBlob(exportFile.blob, exportFile.downloadName);
+        resolve();
       } catch (e) {
         reject(e);
       }
-
-      resolve();
     }),
   };
 }
 
-function getDownloadName(fileOrPath: string | File) {
+export async function generateExportFile(
+  fileOrPath: string | File,
+  object: THREE.Object3D
+): Promise<GeneratedExportFile> {
+  const baseName = getFileBaseName(fileOrPath);
+  const blob = await exportSceneTo3mf(object, baseName);
+
+  return {
+    baseName,
+    blob,
+    downloadName: getDownloadName(fileOrPath),
+  };
+}
+
+export function downloadExportBlob(blob: Blob, downloadName: string) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+
+  link.href = url;
+  link.download = downloadName;
+  link.click();
+
+  window.setTimeout(() => {
+    URL.revokeObjectURL(url);
+  }, 0);
+}
+
+export function getDownloadName(fileOrPath: string | File) {
   return `${getFileBaseName(fileOrPath)}-edited.3mf`;
 }
 
-function getFileBaseName(fileOrPath: string | File) {
+export function getFileBaseName(fileOrPath: string | File) {
   const fileName =
     typeof fileOrPath === 'string'
       ? fileOrPath.split('?')[0].split('/').pop() || 'export.3mf'

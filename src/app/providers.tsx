@@ -1,24 +1,25 @@
 'use client';
 
-import CssBaseline from '@mui/material/CssBaseline';
-import { ThemeProvider } from '@mui/material/styles';
-import { SnackbarProvider } from 'notistack';
-import React from 'react';
-
+import { AuthProvider } from '@/components/AuthContext';
 import { EditorFileProvider } from '@/components/EditorFileContext';
+import { ExportReviewProvider } from '@/components/ExportReviewContext';
+import FloatingInstagramLogo from '@/components/FloatingInstagramLogo';
 import JobNotifications from '@/components/JobNotifications';
 import JobProvider from '@/components/JobProvider';
 import JobSnackbar from '@/components/JobSnackbar';
 import theme from '@/theme';
 import handleUnhandledPromiseRejection from '@/utils/handleUnhandledPromiseRejection';
+import CssBaseline from '@mui/material/CssBaseline';
+import { ThemeProvider } from '@mui/material/styles';
+import { SnackbarProvider } from 'notistack';
+import React from 'react';
 
-export default function Providers({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function Providers({ children }: { children: React.ReactNode }) {
   React.useEffect(() => {
-    window.addEventListener('unhandledrejection', handleUnhandledPromiseRejection);
+    window.addEventListener(
+      'unhandledrejection',
+      handleUnhandledPromiseRejection
+    );
 
     return () => {
       window.removeEventListener(
@@ -31,22 +32,27 @@ export default function Providers({
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <EditorFileProvider>
-        <JobProvider>
-          <SnackbarProvider
-            anchorOrigin={{
-              vertical: 'bottom',
-              horizontal: 'center',
-            }}
-            Components={{
-              job: JobSnackbar,
-            }}
-          >
-            <JobNotifications />
-            {children}
-          </SnackbarProvider>
-        </JobProvider>
-      </EditorFileProvider>
+      <AuthProvider>
+        <EditorFileProvider>
+          <ExportReviewProvider>
+            <JobProvider>
+              <SnackbarProvider
+                anchorOrigin={{
+                  vertical: 'bottom',
+                  horizontal: 'center',
+                }}
+                Components={{
+                  job: JobSnackbar,
+                }}
+              >
+                <JobNotifications />
+                {children}
+                <FloatingInstagramLogo />
+              </SnackbarProvider>
+            </JobProvider>
+          </ExportReviewProvider>
+        </EditorFileProvider>
+      </AuthProvider>
     </ThemeProvider>
   );
 }

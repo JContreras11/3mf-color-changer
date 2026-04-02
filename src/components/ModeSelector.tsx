@@ -95,24 +95,26 @@ const ModeSelector = React.memo(function ModeSelector({
             placement="right"
             disableInteractive
           >
-            <ButtonBase
-              disabled={disabled}
-              onClick={() => onPanelChange(item.id)}
-              sx={{
-                borderRadius: '24px',
-                px: 0.5,
-                py: 1.25,
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 1,
-                transition:
-                  'transform 180ms ease, background-color 180ms ease, opacity 180ms ease',
-                opacity: disabled ? 0.5 : 1,
-                '&:hover': {
-                  transform: disabled ? 'none' : 'translateY(-1px)',
-                },
-              }}
-            >
+            <Box component="span" sx={{ display: 'block' }}>
+              <ButtonBase
+                disabled={disabled}
+                onClick={() => onPanelChange(item.id)}
+                sx={{
+                  width: '100%',
+                  borderRadius: '24px',
+                  px: 0.5,
+                  py: 1.25,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 1,
+                  transition:
+                    'transform 180ms ease, background-color 180ms ease, opacity 180ms ease',
+                  opacity: disabled ? 0.5 : 1,
+                  '&:hover': {
+                    transform: disabled ? 'none' : 'translateY(-1px)',
+                  },
+                }}
+              >
               <Box
                 sx={{
                   width: { xs: 46, md: 52 },
@@ -145,6 +147,7 @@ const ModeSelector = React.memo(function ModeSelector({
                 {item.label}
               </Typography>
             </ButtonBase>
+            </Box>
           </Tooltip>
         );
       })}

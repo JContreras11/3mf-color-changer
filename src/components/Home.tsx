@@ -2,22 +2,31 @@
 
 import ArrowForwardRoundedIcon from '@mui/icons-material/ArrowForwardRounded';
 import CloudUploadRoundedIcon from '@mui/icons-material/CloudUploadRounded';
+import LockRoundedIcon from '@mui/icons-material/LockRounded';
+import LogoutRoundedIcon from '@mui/icons-material/LogoutRounded';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Chip from '@mui/material/Chip';
+import CircularProgress from '@mui/material/CircularProgress';
 import Grid from '@mui/material/Grid';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import { alpha } from '@mui/material/styles';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { enqueueSnackbar } from 'notistack';
 import React from 'react';
-import { useRouter } from 'next/navigation';
 
+import { useAuth } from './AuthContext';
 import { useEditorFile } from './EditorFileContext';
+import { useExportReview } from './ExportReviewContext';
 import FileDrop from './FileDrop';
+import LoginDialog from './LoginDialog';
 import PermanentDrawer from './PermanentDrawer';
 
 type CapOption = {
   description: string;
+  disabled?: boolean;
+  disabledLabel?: string;
   eta: string;
   id: string;
   imagePath: string;
@@ -26,7 +35,7 @@ type CapOption = {
   title: string;
 };
 
-const BRAND_TITLE = 'CustomCaps';
+const BRAND_TITLE = 'Customize your caps';
 const DESIGN_COLORS = {
   accent: '#a43c12',
   background: '#f8f9fa',
@@ -38,11 +47,32 @@ const DESIGN_COLORS = {
   textBody: '#414755',
   textMuted: '#7d8697',
 } as const;
+const DEFAULT_LOGIN_DESCRIPTION =
+  'Use your authorized studio credentials to unlock the Trucker Cap workflow and the rest of the app.';
 
 export default function HomeRoute() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const {
+    isAuthenticated,
+    isLoading: isAuthLoading,
+    logout,
+    username,
+  } = useAuth();
   const { clearUploadedFile, setUploadedFile } = useEditorFile();
+  const { clearReviewData } = useExportReview();
   const [selectedCapId, setSelectedCapId] = React.useState('trucker-cap');
+  const [isLoginOpen, setIsLoginOpen] = React.useState(false);
+  const [loginDescription, setLoginDescription] = React.useState(
+    DEFAULT_LOGIN_DESCRIPTION
+  );
+  const [loginTitle, setLoginTitle] = React.useState('Studio Login');
+  const [pendingRouteAfterLogin, setPendingRouteAfterLogin] = React.useState<
+    string | null
+  >(null);
+  const autoOpenedAuthGateRef = React.useRef(false);
+  const authRequired = searchParams.get('auth') === 'required';
+  const redirectAfterLogin = searchParams.get('next');
 
   const capOptions = React.useMemo<CapOption[]>(
     () => [
@@ -62,6 +92,8 @@ export default function HomeRoute() {
         subtitle: 'Seamless, aerodynamic design.',
         description:
           'A smoother silhouette prepared for premium text placement and clean add-ons.',
+        disabled: true,
+        disabledLabel: 'Disabled',
         eta: '14–18 Hours',
         imagePath: '/caps/future.webp',
         path: 'examples/future_cap.3mf',
@@ -72,6 +104,8 @@ export default function HomeRoute() {
         subtitle: 'Wide brim, parametric lattice.',
         description:
           'A wider printable canvas with wraparound customization and softer profiles.',
+        disabled: true,
+        disabledLabel: 'Disabled',
         eta: '16–22 Hours',
         imagePath: '/caps/bucket.webp',
         path: 'examples/bucket_hat.3mf',
@@ -80,200 +114,448 @@ export default function HomeRoute() {
     []
   );
 
+  const openLoginDialog = React.useCallback(
+    ({
+      description = DEFAULT_LOGIN_DESCRIPTION,
+      route = null,
+      title = 'Studio Login',
+    }: {
+      description?: string;
+      route?: string | null;
+      title?: string;
+    }) => {
+      setPendingRouteAfterLogin(route);
+      setLoginTitle(title);
+      setLoginDescription(description);
+      setIsLoginOpen(true);
+    },
+    []
+  );
+
+  React.useEffect(() => {
+    if (!authRequired) {
+      autoOpenedAuthGateRef.current = false;
+      return;
+    }
+
+    if (autoOpenedAuthGateRef.current || isAuthLoading || isAuthenticated) {
+      return;
+    }
+
+    autoOpenedAuthGateRef.current = true;
+    openLoginDialog({
+      description:
+        'You need to sign in before accessing the protected editor and export workspace.',
+      route: redirectAfterLogin,
+      title: 'Studio Login Required',
+    });
+  }, [
+    authRequired,
+    isAuthenticated,
+    isAuthLoading,
+    openLoginDialog,
+    redirectAfterLogin,
+  ]);
+
+  const getEditorRoute = React.useCallback((path: string) => {
+    return '/editor?example=' + encodeURIComponent(path);
+  }, []);
+
   const handleExampleSelect = React.useCallback(
     (path: string) => {
+      clearReviewData();
       clearUploadedFile();
-      router.push('/editor?example=' + encodeURIComponent(path));
+      router.push(getEditorRoute(path));
     },
-    [clearUploadedFile, router]
+    [clearReviewData, clearUploadedFile, getEditorRoute, router]
   );
 
   const handleFileChange = React.useCallback(
     (file: File) => {
+      clearReviewData();
       setUploadedFile(file);
       router.push('/editor');
     },
-    [router, setUploadedFile]
+    [clearReviewData, router, setUploadedFile]
+  );
+
+  const handleCapActivate = React.useCallback(
+    (cap: CapOption) => {
+      if (cap.disabled || isAuthLoading) {
+        return;
+      }
+
+      setSelectedCapId(cap.id);
+
+      if (!isAuthenticated) {
+        openLoginDialog({
+          description: `Sign in to unlock ${cap.title} and continue into the protected customization workspace.`,
+          route: getEditorRoute(cap.path),
+          title: 'Unlock Trucker Cap',
+        });
+      }
+    },
+    [getEditorRoute, isAuthLoading, isAuthenticated, openLoginDialog]
+  );
+
+  const handleCapOpen = React.useCallback(
+    (cap: CapOption) => {
+      if (cap.disabled || isAuthLoading) {
+        return;
+      }
+
+      if (!isAuthenticated) {
+        openLoginDialog({
+          description: `Sign in to open ${cap.title} in the protected editor.`,
+          route: getEditorRoute(cap.path),
+          title: 'Studio Login',
+        });
+        return;
+      }
+
+      handleExampleSelect(cap.path);
+    },
+    [
+      getEditorRoute,
+      handleExampleSelect,
+      isAuthLoading,
+      isAuthenticated,
+      openLoginDialog,
+    ]
+  );
+
+  const handleUploadLocked = React.useCallback(() => {
+    if (isAuthLoading) {
+      return;
+    }
+
+    openLoginDialog({
+      description:
+        'Sign in before uploading a private 3MF template. Upload access is only enabled for authenticated studio sessions.',
+      route: null,
+      title: 'Login to Upload 3MF',
+    });
+  }, [isAuthLoading, openLoginDialog]);
+
+  const handleLoginAuthenticated = React.useCallback(() => {
+    setIsLoginOpen(false);
+
+    if (pendingRouteAfterLogin) {
+      const nextRoute = pendingRouteAfterLogin;
+      setPendingRouteAfterLogin(null);
+      router.push(nextRoute);
+      return;
+    }
+
+    enqueueSnackbar('Access unlocked. Trucker Cap is now available.', {
+      variant: 'success',
+    });
+  }, [pendingRouteAfterLogin, router]);
+
+  const handleLogout = React.useCallback(async () => {
+    await logout();
+    clearUploadedFile();
+    clearReviewData();
+    setPendingRouteAfterLogin(null);
+    setIsLoginOpen(false);
+    enqueueSnackbar('Session closed. Login is required to use the app again.', {
+      variant: 'info',
+    });
+    router.replace('/');
+  }, [clearReviewData, clearUploadedFile, logout, router]);
+
+  const headerAction = isAuthLoading ? (
+    <Button
+      disabled
+      startIcon={<CircularProgress size={16} color="inherit" />}
+      sx={headerGhostButtonSx}
+    >
+      Checking access
+    </Button>
+  ) : isAuthenticated ? (
+    <Button
+      onClick={handleLogout}
+      startIcon={<LogoutRoundedIcon />}
+      sx={headerGhostButtonSx}
+    >
+      {username ? `Logout · ${username}` : 'Logout'}
+    </Button>
+  ) : (
+    <Button
+      onClick={() =>
+        openLoginDialog({
+          description:
+            'Sign in with your enabled studio credentials to access Trucker Cap and private uploads.',
+        })
+      }
+      startIcon={<LockRoundedIcon />}
+      sx={headerGhostButtonSx}
+    >
+      Studio Login
+    </Button>
   );
 
   return (
-    <PermanentDrawer title={BRAND_TITLE}>
-      <Box
-        component="section"
-        sx={{
-          px: { xs: 2, sm: 2.5, md: 4 },
-          pt: { xs: 4, sm: 5, md: 6 },
-          pb: { xs: 5, sm: 6, md: 8 },
-        }}
+    <>
+      <PermanentDrawer title={BRAND_TITLE} action={headerAction}>
+        <Box
+          component="section"
+          sx={{
+            px: { xs: 2, sm: 2.5, md: 4 },
+            pt: { xs: 4, sm: 5, md: 6 },
+            pb: { xs: 5, sm: 6, md: 8 },
+          }}
         >
           <Stack
-          alignItems="center"
-          spacing={{ xs: 1.25, sm: 1.5, md: 2 }}
-          sx={{ mb: { xs: 3.5, sm: 4.5, md: 7 } }}
-        >
-          <Typography
-            sx={{
-              color: DESIGN_COLORS.accent,
-              fontSize: { xs: 13, sm: 14, md: 16 },
-              fontWeight: 800,
-              letterSpacing: { xs: '0.18em', sm: '0.22em', md: '0.28em' },
-              textTransform: 'uppercase',
-              textAlign: 'center',
-            }}
+            alignItems="center"
+            spacing={{ xs: 1.25, sm: 1.5, md: 2 }}
+            sx={{ mb: { xs: 3.5, sm: 4.5, md: 7 } }}
           >
-            Step 01 / 04
-          </Typography>
-          <Typography
-            sx={{
-              fontFamily: '"Manrope", "Inter", sans-serif',
-              fontSize: { xs: 30, sm: 40, md: 54, lg: 64 },
-              fontWeight: 800,
-              letterSpacing: '-0.05em',
-              lineHeight: { xs: 0.96, md: 0.95 },
-              textAlign: 'center',
-              maxWidth: { xs: 340, sm: 520, md: 760, lg: 920 },
-            }}
-          >
-            Choose your base silhouette.
-          </Typography>
-          <Typography
-            sx={{
-              color: DESIGN_COLORS.textBody,
-              fontSize: { xs: 15, sm: 17, md: 20 },
-              lineHeight: { xs: 1.5, md: 1.6 },
-              textAlign: 'center',
-              maxWidth: { xs: 340, sm: 580, md: 760 },
-            }}
-          >
-            Select the canvas for your creation. Each silhouette is optimized
-            for high-fidelity 3D printing, layered finishes and editorial-grade
-            customization.
-          </Typography>
-        </Stack>
-
-        <Grid container spacing={{ xs: 2, sm: 2.5, md: 3 }}>
-          {capOptions.map((option) => {
-            const isSelected = option.id === selectedCapId;
-
-            return (
-              <Grid size={{ xs: 12, sm: 6, lg: 4 }} key={option.id}>
-                <CapCard
-                  cap={option}
-                  selected={isSelected}
-                  onActivate={() => setSelectedCapId(option.id)}
-                  onOpen={() => handleExampleSelect(option.path)}
-                />
-              </Grid>
-            );
-          })}
-        </Grid>
-
-        <Box sx={{ mt: { xs: 3.5, sm: 4.5, md: 6 }, maxWidth: 560 }}>
-          <FileDrop
-            onDrop={(files) => handleFileChange(files[0])}
-            sx={{
-              border: 'none',
-              borderRadius: { xs: '22px', md: '28px' },
-              bgcolor: alpha(DESIGN_COLORS.surfaceLowest, 0.82),
-              boxShadow: '0 24px 60px rgba(0, 88, 188, 0.08)',
-              backdropFilter: 'blur(20px)',
-              px: { xs: 2, sm: 2.5, md: 3.5 },
-              py: { xs: 2, sm: 2.5, md: 3 },
-            }}
-          >
-            <Stack
-              direction={{ xs: 'column', md: 'row' }}
-              spacing={{ xs: 1.75, md: 2 }}
-              alignItems={{ xs: 'stretch', md: 'center' }}
-              justifyContent="space-between"
+            <Typography
+              sx={{
+                fontFamily: '"Manrope", "Inter", sans-serif',
+                fontSize: { xs: 30, sm: 40, md: 54, lg: 64 },
+                fontWeight: 800,
+                letterSpacing: '-0.05em',
+                lineHeight: { xs: 0.96, md: 0.95 },
+                textAlign: 'center',
+                maxWidth: { xs: 340, sm: 520, md: 760, lg: 920 },
+              }}
             >
-              <Stack direction="row" spacing={{ xs: 1.5, md: 2 }} alignItems="center">
-                <Box
+              Choose your base
+            </Typography>
+            <Typography
+              sx={{
+                color: DESIGN_COLORS.textBody,
+                fontSize: { xs: 15, sm: 17, md: 20 },
+                lineHeight: { xs: 1.5, md: 1.6 },
+                textAlign: 'center',
+                maxWidth: { xs: 340, sm: 580, md: 760 },
+              }}
+            >
+              Only the enabled Trucker Cap workflow is currently available. Sign
+              in with studio credentials to unlock the editor, export review and
+              private 3MF uploads.
+            </Typography>
+            <Chip
+              icon={
+                isAuthLoading ? (
+                  <CircularProgress size={16} color="inherit" />
+                ) : (
+                  <LockRoundedIcon />
+                )
+              }
+              label={
+                isAuthLoading
+                  ? 'Checking studio access'
+                  : isAuthenticated
+                    ? `Access unlocked for ${username || 'studio user'}`
+                    : 'Protected studio access required'
+              }
+              sx={{
+                mt: 1,
+                minHeight: 42,
+                px: 1,
+                borderRadius: '999px',
+                bgcolor: isAuthenticated
+                  ? alpha('#13a247', 0.1)
+                  : alpha('#0058bc', 0.08),
+                color: isAuthenticated ? '#1f5131' : '#0058bc',
+                fontWeight: 700,
+                '& .MuiChip-icon': {
+                  color: 'inherit',
+                },
+              }}
+            />
+          </Stack>
+
+          <Grid container spacing={{ xs: 2, sm: 2.5, md: 3 }}>
+            {capOptions.map((option) => {
+              const isSelected = option.id === selectedCapId;
+
+              return (
+                <Grid size={{ xs: 12, sm: 6, lg: 4 }} key={option.id}>
+                  <CapCard
+                    cap={option}
+                    loadingAccess={isAuthLoading}
+                    onActivate={() => handleCapActivate(option)}
+                    onOpen={() => handleCapOpen(option)}
+                    protectedLocked={
+                      !option.disabled && !isAuthenticated && !isAuthLoading
+                    }
+                    selected={isSelected}
+                  />
+                </Grid>
+              );
+            })}
+          </Grid>
+
+          {/* <Box sx={{ mt: { xs: 3.5, sm: 4.5, md: 6 }, maxWidth: 560}}>
+            <FileDrop
+              disabled={!isAuthenticated || isAuthLoading}
+              onDisabledClick={handleUploadLocked}
+              onDrop={(files) => handleFileChange(files[0])}
+              sx={{
+                border: 'none',
+                borderRadius: { xs: '22px', md: '28px' },
+                bgcolor: alpha(DESIGN_COLORS.surfaceLowest, 0.82),
+                boxShadow: '0 24px 60px rgba(0, 88, 188, 0.08)',
+                backdropFilter: 'blur(20px)',
+                px: { xs: 2, sm: 2.5, md: 3.5 },
+                py: { xs: 2, sm: 2.5, md: 3 },
+              }}
+            >
+              <Stack
+                direction={{ xs: 'column', md: 'row' }}
+                spacing={{ xs: 1.75, md: 2 }}
+                alignItems={{ xs: 'stretch', md: 'center' }}
+                justifyContent="space-between"
+              >
+                <Stack
+                  direction="row"
+                  spacing={{ xs: 1.5, md: 2 }}
+                  alignItems="center"
+                >
+                  <Box
+                    sx={{
+                      width: { xs: 50, md: 60 },
+                      height: { xs: 50, md: 60 },
+                      borderRadius: { xs: '16px', md: '20px' },
+                      display: 'grid',
+                      placeItems: 'center',
+                      bgcolor: alpha(DESIGN_COLORS.primary, 0.1),
+                      color: DESIGN_COLORS.primary,
+                    }}
+                  >
+                    <CloudUploadRoundedIcon
+                      sx={{ fontSize: { xs: 24, md: 28 } }}
+                    />
+                  </Box>
+                  <Box>
+                    <Typography
+                      sx={{
+                        fontSize: { xs: 18, md: 22 },
+                        fontWeight: 700,
+                        fontFamily: '"Manrope", "Inter", sans-serif',
+                      }}
+                    >
+                      Use your own 3MF template
+                    </Typography>
+                    <Typography
+                      sx={{
+                        color: DESIGN_COLORS.textBody,
+                        fontSize: { xs: 14, md: 15 },
+                        lineHeight: 1.6,
+                        maxWidth: 360,
+                      }}
+                    >
+                      {isAuthenticated
+                        ? 'Drag and drop a cap file or click here to open a local 3MF without sending it to any server.'
+                        : 'Private 3MF uploads stay locked until you sign in with an enabled studio account.'}
+                    </Typography>
+                  </Box>
+                </Stack>
+
+                <Button
+                  variant="contained"
+                  disabled={!isAuthenticated || isAuthLoading}
+                  endIcon={<ArrowForwardRoundedIcon />}
                   sx={{
-                    width: { xs: 50, md: 60 },
-                    height: { xs: 50, md: 60 },
-                    borderRadius: { xs: '16px', md: '20px' },
-                    display: 'grid',
-                    placeItems: 'center',
-                    bgcolor: alpha(DESIGN_COLORS.primary, 0.1),
-                    color: DESIGN_COLORS.primary,
+                    ...ctaButtonSx,
+                    width: { xs: '100%', md: 'auto' },
                   }}
                 >
-                  <CloudUploadRoundedIcon sx={{ fontSize: { xs: 24, md: 28 } }} />
-                </Box>
-                <Box>
-                  <Typography
-                    sx={{
-                      fontSize: { xs: 18, md: 22 },
-                      fontWeight: 700,
-                      fontFamily: '"Manrope", "Inter", sans-serif',
-                    }}
-                  >
-                    Use your own 3MF template
-                  </Typography>
-                  <Typography
-                    sx={{
-                      color: DESIGN_COLORS.textBody,
-                      fontSize: { xs: 14, md: 15 },
-                      lineHeight: 1.6,
-                      maxWidth: 360,
-                    }}
-                  >
-                    Drag and drop a cap file or click here to open a local 3MF
-                    without sending it to any server.
-                  </Typography>
-                </Box>
+                  {isAuthenticated ? 'Upload 3MF' : 'Login required'}
+                </Button>
               </Stack>
-
-              <Button
-                variant="contained"
-                endIcon={<ArrowForwardRoundedIcon />}
-                sx={{
-                  ...ctaButtonSx,
-                  width: { xs: '100%', md: 'auto' },
-                }}
-              >
-                Upload 3MF
-              </Button>
-            </Stack>
-          </FileDrop>
+            </FileDrop>
+          </Box> */}
         </Box>
-      </Box>
-    </PermanentDrawer>
+      </PermanentDrawer>
+
+      <LoginDialog
+        description={loginDescription}
+        onAuthenticated={handleLoginAuthenticated}
+        onClose={() => setIsLoginOpen(false)}
+        open={isLoginOpen}
+        title={loginTitle}
+      />
+    </>
   );
 }
 
 function CapCard({
   cap,
-  selected,
+  loadingAccess,
   onActivate,
   onOpen,
+  protectedLocked,
+  selected,
 }: {
   cap: CapOption;
-  selected: boolean;
+  loadingAccess: boolean;
   onActivate: () => void;
   onOpen: () => void;
+  protectedLocked: boolean;
+  selected: boolean;
 }) {
+  const disabled = !!cap.disabled;
+  const accessGranted = !protectedLocked && !loadingAccess;
+  const statusLabel = disabled
+    ? cap.disabledLabel || 'Disabled'
+    : protectedLocked
+      ? 'Login required'
+      : selected
+        ? 'Selected'
+        : null;
+  const primaryButtonLabel = disabled
+    ? 'Unavailable'
+    : selected
+      ? accessGranted
+        ? 'Next: Customize'
+        : loadingAccess
+          ? 'Checking access...'
+          : 'Unlock Trucker Cap'
+      : accessGranted
+        ? 'Select Base'
+        : loadingAccess
+          ? 'Checking access...'
+          : 'Login to continue';
+
+  const handleCardClick = () => {
+    if (disabled) {
+      return;
+    }
+
+    onActivate();
+  };
+
   return (
     <Box
-      onClick={onActivate}
+      onClick={handleCardClick}
       sx={{
         height: '100%',
         p: { xs: 2, sm: 2.5, md: 3 },
         borderRadius: { xs: '26px', md: '32px' },
         bgcolor: DESIGN_COLORS.surfaceLowest,
-        border: selected
-          ? `2px solid ${DESIGN_COLORS.primary}`
-          : `1px solid ${alpha(DESIGN_COLORS.textMuted, 0.08)}`,
-        boxShadow: selected
-          ? '0 26px 70px rgba(0, 88, 188, 0.10)'
-          : '0 24px 60px rgba(15, 23, 42, 0.05)',
-        transition: 'transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease',
-        cursor: 'pointer',
-        '&:hover': {
-          transform: 'translateY(-4px)',
-          boxShadow: '0 26px 70px rgba(0, 88, 188, 0.10)',
-        },
+        border:
+          selected && !disabled
+            ? `2px solid ${DESIGN_COLORS.primary}`
+            : `1px solid ${alpha(DESIGN_COLORS.textMuted, 0.08)}`,
+        boxShadow:
+          selected && !disabled
+            ? '0 26px 70px rgba(0, 88, 188, 0.10)'
+            : '0 24px 60px rgba(15, 23, 42, 0.05)',
+        transition:
+          'transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease, opacity 180ms ease',
+        cursor: disabled ? 'not-allowed' : 'pointer',
+        opacity: disabled ? 0.56 : 1,
+        '&:hover': disabled
+          ? undefined
+          : {
+              transform: 'translateY(-4px)',
+              boxShadow: '0 26px 70px rgba(0, 88, 188, 0.10)',
+            },
       }}
     >
       <Box
@@ -297,15 +579,23 @@ function CapCard({
               'radial-gradient(circle at 50% 12%, rgba(255,255,255,0.96) 0%, rgba(243,244,245,0.9) 56%, rgba(232,236,241,0.75) 100%)',
           }}
         />
-        {selected && (
+        {statusLabel && (
           <Chip
-            label="Selected"
+            label={statusLabel}
             sx={{
               position: 'absolute',
               top: { xs: 14, md: 20 },
               right: { xs: 12, md: 18 },
-              bgcolor: DESIGN_COLORS.primary,
-              color: '#fff',
+              bgcolor: disabled
+                ? alpha('#111827', 0.12)
+                : protectedLocked
+                  ? alpha('#0058bc', 0.12)
+                  : DESIGN_COLORS.primary,
+              color: disabled
+                ? '#4b5563'
+                : protectedLocked
+                  ? DESIGN_COLORS.primary
+                  : '#fff',
               fontWeight: 700,
               textTransform: 'uppercase',
               letterSpacing: '0.08em',
@@ -369,9 +659,19 @@ function CapCard({
           <Button
             fullWidth
             variant="contained"
-            endIcon={<ArrowForwardRoundedIcon />}
+            disabled={disabled || loadingAccess}
+            endIcon={
+              loadingAccess ? (
+                <CircularProgress size={18} color="inherit" />
+              ) : (
+                <ArrowForwardRoundedIcon />
+              )
+            }
             onClick={(event) => {
               event.stopPropagation();
+              if (disabled) {
+                return;
+              }
               onOpen();
             }}
             sx={{
@@ -380,7 +680,7 @@ function CapCard({
               py: { xs: 1.2, md: 1.6 },
             }}
           >
-            Next: Customize
+            {primaryButtonLabel}
           </Button>
         </>
       ) : (
@@ -417,8 +717,12 @@ function CapCard({
 
           <Button
             variant="contained"
+            disabled={disabled || loadingAccess}
             onClick={(event) => {
               event.stopPropagation();
+              if (disabled) {
+                return;
+              }
               onOpen();
             }}
             sx={{
@@ -426,19 +730,23 @@ function CapCard({
               py: { xs: 1.15, md: 1.45 },
               px: { xs: 2, md: 3 },
               borderRadius: '999px',
-              bgcolor: DESIGN_COLORS.surfaceLow,
-              color: '#1f2937',
+              bgcolor: disabled
+                ? alpha(DESIGN_COLORS.textMuted, 0.12)
+                : DESIGN_COLORS.surfaceLow,
+              color: disabled ? DESIGN_COLORS.textMuted : '#1f2937',
               boxShadow: 'none',
               fontWeight: 700,
               textTransform: 'none',
               fontSize: { xs: 16, md: 18 },
-              '&:hover': {
-                bgcolor: alpha(DESIGN_COLORS.primary, 0.12),
-                boxShadow: 'none',
-              },
+              '&:hover': disabled
+                ? undefined
+                : {
+                    bgcolor: alpha(DESIGN_COLORS.primary, 0.12),
+                    boxShadow: 'none',
+                  },
             }}
           >
-            Select Base
+            {primaryButtonLabel}
           </Button>
         </Stack>
       )}
@@ -446,20 +754,16 @@ function CapCard({
   );
 }
 
-function ModePill({
-  active,
-  label,
-}: {
-  active?: boolean;
-  label: string;
-}) {
+function ModePill({ active, label }: { active?: boolean; label: string }) {
   return (
     <Box
       sx={{
         px: { xs: 1.5, md: 2.1 },
         py: { xs: 0.85, md: 1.1 },
         borderRadius: '999px',
-        bgcolor: active ? alpha(DESIGN_COLORS.primary, 0.1) : DESIGN_COLORS.surfaceLow,
+        bgcolor: active
+          ? alpha(DESIGN_COLORS.primary, 0.1)
+          : DESIGN_COLORS.surfaceLow,
         color: active ? DESIGN_COLORS.primary : DESIGN_COLORS.textBody,
         fontSize: { xs: 13, md: 15 },
         fontWeight: 700,
@@ -521,5 +825,20 @@ const ctaButtonSx = {
   '&:hover': {
     background: `linear-gradient(135deg, ${DESIGN_COLORS.primary} 0%, ${DESIGN_COLORS.primaryContainer} 100%)`,
     boxShadow: '0 20px 44px rgba(0, 88, 188, 0.18)',
+  },
+} as const;
+
+const headerGhostButtonSx = {
+  borderRadius: '999px',
+  minHeight: 46,
+  px: { xs: 2.4, md: 3 },
+  bgcolor: alpha('#ffffff', 0.82),
+  border: `1px solid ${alpha('#cad4ea', 0.9)}`,
+  color: '#1f2937',
+  fontWeight: 700,
+  textTransform: 'none',
+  boxShadow: '0 12px 24px rgba(15, 23, 42, 0.05)',
+  '&:hover': {
+    bgcolor: alpha('#ffffff', 0.96),
   },
 } as const;

@@ -8,17 +8,17 @@ import Stack from '@mui/material/Stack';
 import Toolbar from '@mui/material/Toolbar';
 import Typography from '@mui/material/Typography';
 import { alpha } from '@mui/material/styles';
-import * as React from 'react';
 import { usePathname } from 'next/navigation';
+import * as React from 'react';
 
 import NextLink from './NextLink';
 
 const drawerWidth = 340;
-const brandTitle = 'CustomCaps';
+const brandTitle = 'Customize your caps';
 const steps: ReadonlyArray<{ label: string; paths: readonly string[] }> = [
   { label: 'Base', paths: ['/'] },
   { label: 'Design', paths: ['/editor'] },
-  { label: 'Export', paths: [] },
+  { label: 'Export', paths: ['/export'] },
 ];
 
 type Props = {

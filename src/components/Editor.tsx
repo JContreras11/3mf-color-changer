@@ -1,7 +1,7 @@
 'use client';
 
-import ThreeDRotationRoundedIcon from '@mui/icons-material/ThreeDRotationRounded';
 import RedoRoundedIcon from '@mui/icons-material/RedoRounded';
+import ThreeDRotationRoundedIcon from '@mui/icons-material/ThreeDRotationRounded';
 import UndoRoundedIcon from '@mui/icons-material/UndoRounded';
 import VideocamRoundedIcon from '@mui/icons-material/VideocamRounded';
 import ZoomInRoundedIcon from '@mui/icons-material/ZoomInRounded';
@@ -15,18 +15,19 @@ import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { alpha } from '@mui/material/styles';
 import { ThreeEvent } from '@react-three/fiber';
-import { enqueueSnackbar } from 'notistack';
 import { useRouter } from 'next/navigation';
+import { enqueueSnackbar } from 'notistack';
 import React, { useEffect } from 'react';
 import * as THREE from 'three';
 
 import {
+  TRUCKER_ADDON_OPTIONS,
   getCapFamily,
   getCapFamilyLabel,
   getSelectedAddonId,
-  TRUCKER_ADDON_OPTIONS,
 } from '../etc/designCatalog';
-import exportFileJob from '../jobs/exportFile';
+import { generateExportFile } from '../jobs/exportFile';
+import { createExportReviewData } from '../utils/exportReview';
 import applyRasterOverlay from '../utils/threejs/applyRasterOverlay';
 import changeFaceColor from '../utils/threejs/changeFaceColor';
 import changeMeshColor from '../utils/threejs/changeMeshColor';
@@ -40,14 +41,14 @@ import {
   getRasterOverlayPlacement,
 } from '../utils/threejs/rasterOverlayPlacement';
 import { useEditorFile } from './EditorFileContext';
-import { useJobContext } from './JobProvider';
+import { useExportReview } from './ExportReviewContext';
 import ModeSelector, { DesignPanel, Mode } from './ModeSelector';
 import OverlayBrushPanel from './OverlayBrushPanel';
 import PermanentDrawer from './PermanentDrawer';
 import ThreeJsCanvas, { ThreeJsCanvasHandle } from './threeJs/Canvas';
 import useFile from './threeJs/useFile';
 
-const BRAND_TITLE = 'CustomCaps';
+const BRAND_TITLE = 'Customize your caps';
 const DEFAULT_IMAGE_ROTATION = 0;
 const DEFAULT_IMAGE_SIZE = 30;
 const DEFAULT_TEXT = 'Text';
@@ -102,7 +103,7 @@ type Props = {
 
 export default function Editor({ examplePath, onSettingsChange }: Props) {
   const { uploadedFile } = useEditorFile();
-  const { addJob } = useJobContext();
+  const { setReviewData } = useExportReview();
   const router = useRouter();
   const initialSettingsRef = React.useRef<Settings>(loadEditorSettings());
   const file = examplePath || uploadedFile || undefined;
@@ -122,24 +123,22 @@ export default function Editor({ examplePath, onSettingsChange }: Props) {
   const [activePanel, setActivePanel] = React.useState<DesignPanel>(
     getDesignPanelFromMode(initialMode)
   );
-  const [workingColor, setWorkingColor] = React.useState<string>(
-    initialWorkingColor
-  );
-  const [imageCanvas, setImageCanvas] = React.useState<HTMLCanvasElement | null>(
-    null
-  );
+  const [workingColor, setWorkingColor] =
+    React.useState<string>(initialWorkingColor);
+  const [imageCanvas, setImageCanvas] =
+    React.useState<HTMLCanvasElement | null>(null);
   const [imageFile, setImageFile] = React.useState<File | null>(null);
   const [imageName, setImageName] = React.useState<string>();
   const [imageSize, setImageSize] = React.useState(DEFAULT_IMAGE_SIZE);
-  const [imageRotation, setImageRotation] =
-    React.useState(DEFAULT_IMAGE_ROTATION);
+  const [imageRotation, setImageRotation] = React.useState(
+    DEFAULT_IMAGE_ROTATION
+  );
   const [imagePreviewUrl, setImagePreviewUrl] = React.useState<string | null>(
     null
   );
   const [textValue, setTextValue] = React.useState(DEFAULT_TEXT);
   const [textSize, setTextSize] = React.useState(DEFAULT_TEXT_SIZE);
-  const [textRotation, setTextRotation] =
-    React.useState(DEFAULT_TEXT_ROTATION);
+  const [textRotation, setTextRotation] = React.useState(DEFAULT_TEXT_ROTATION);
   const [ghostOverlay, setGhostOverlay] = React.useState<GhostOverlay | null>(
     null
   );
@@ -150,6 +149,7 @@ export default function Editor({ examplePath, onSettingsChange }: Props) {
       canRedo: false,
       canUndo: false,
     });
+  const [isPreparingExport, setIsPreparingExport] = React.useState(false);
   const [isSceneReady, setIsSceneReady] = React.useState(false);
   const [, setSceneRevision] = React.useState(0);
   const canvasControlsRef = React.useRef<ThreeJsCanvasHandle | null>(null);
@@ -165,10 +165,7 @@ export default function Editor({ examplePath, onSettingsChange }: Props) {
     () => getCapFamilyLabel(capFamily),
     [capFamily]
   );
-  const selectedAddonId = React.useMemo(
-    () => getSelectedAddonId(file),
-    [file]
-  );
+  const selectedAddonId = React.useMemo(() => getSelectedAddonId(file), [file]);
   const canUseCuratedAddons =
     capFamily === 'trucker' && typeof file === 'string';
   const canUndo = historyAvailability.canUndo;
@@ -176,7 +173,8 @@ export default function Editor({ examplePath, onSettingsChange }: Props) {
   const showHistoryControls = canUndo || canRedo;
   const isApplyingOverlay = pendingOverlayKind !== null;
   const isEditorLoading = fileState.isLoading || (!!object && !isSceneReady);
-  const isEditorBusy = isEditorLoading || isApplyingOverlay;
+  const isEditorBusy =
+    isEditorLoading || isApplyingOverlay || isPreparingExport;
   const modelLoadingTitle = object
     ? 'Preparing your atelier view'
     : 'Loading 3MF file';
@@ -189,10 +187,19 @@ export default function Editor({ examplePath, onSettingsChange }: Props) {
     pendingOverlayKind === 'image'
       ? 'Optimizing and projecting your graphic onto the cap surface.'
       : 'Calculating the text projection and fitting it onto the cap surface.';
-  const busyTitle = isApplyingOverlay ? processingTitle : modelLoadingTitle;
-  const busyDescription = isApplyingOverlay
-    ? processingDescription
-    : modelLoadingDescription;
+  const exportPreparingTitle = 'Generating ready-to-print 3MF';
+  const exportPreparingDescription =
+    'Baking your latest geometry edits into a final export package before opening the review step.';
+  const busyTitle = isPreparingExport
+    ? exportPreparingTitle
+    : isApplyingOverlay
+      ? processingTitle
+      : modelLoadingTitle;
+  const busyDescription = isPreparingExport
+    ? exportPreparingDescription
+    : isApplyingOverlay
+      ? processingDescription
+      : modelLoadingDescription;
   const addonPanelDescription = canUseCuratedAddons
     ? `Swap between curated ${capFamilyLabel} accessory variations. Selecting one reloads the matching 3MF directly in the browser.`
     : capFamily === 'custom'
@@ -397,8 +404,38 @@ export default function Editor({ examplePath, onSettingsChange }: Props) {
       return;
     }
 
-    addJob(exportFileJob(file, object));
-  }, [addJob, file, isEditorBusy, object]);
+    let shouldResetPreparingExport = true;
+
+    setIsPreparingExport(true);
+    setGhostOverlay(null);
+
+    try {
+      await waitForNextPaint(2);
+
+      const generatedFile = await generateExportFile(file, object);
+      const previewObject = cloneObjectForHistory(object);
+
+      setReviewData(
+        createExportReviewData({
+          fileOrPath: file,
+          object,
+          previewObject,
+          generatedFile,
+        })
+      );
+
+      shouldResetPreparingExport = false;
+      router.push('/export');
+    } catch (error) {
+      enqueueSnackbar(error instanceof Error ? error.message : String(error), {
+        variant: 'error',
+      });
+    } finally {
+      if (shouldResetPreparingExport) {
+        setIsPreparingExport(false);
+      }
+    }
+  }, [file, isEditorBusy, object, router, setReviewData]);
 
   const handleMeshColorChange = (uuid, color: string) => {
     object?.traverse((child) => {
@@ -552,19 +589,23 @@ export default function Editor({ examplePath, onSettingsChange }: Props) {
     const overlayFace = e.face;
     const overlayName = imageName || 'Image overlay';
 
-    await runOverlayPlacement('image', async () => {
-      await applyRasterOverlay({
-        camera,
-        root: object,
-        targetMesh: mesh,
-        pointWorld,
-        face: overlayFace,
-        canvas: imageCanvas,
-        size: imageSize,
-        rotationDegrees: imageRotation,
-        name: overlayName,
-      });
-    }, object);
+    await runOverlayPlacement(
+      'image',
+      async () => {
+        await applyRasterOverlay({
+          camera,
+          root: object,
+          targetMesh: mesh,
+          pointWorld,
+          face: overlayFace,
+          canvas: imageCanvas,
+          size: imageSize,
+          rotationDegrees: imageRotation,
+          name: overlayName,
+        });
+      },
+      object
+    );
   };
 
   const handleTextOverlay = async (e: ThreeEvent<MouseEvent>) => {
@@ -580,7 +621,9 @@ export default function Editor({ examplePath, onSettingsChange }: Props) {
 
     try {
       if (!textCanvas) {
-        throw new Error('Please enter some text before placing it on the model.');
+        throw new Error(
+          'Please enter some text before placing it on the model.'
+        );
       }
 
       const camera = e.camera as THREE.Camera;
@@ -588,34 +631,41 @@ export default function Editor({ examplePath, onSettingsChange }: Props) {
       const overlayFace = e.face;
       const overlayName = textValue.trim() || 'Text overlay';
 
-      await runOverlayPlacement('text', async () => {
-        await applyRasterOverlay({
-          camera,
-          root: object,
-          targetMesh: mesh,
-          pointWorld,
-          face: overlayFace,
-          canvas: textCanvas,
-          size: textSize,
-          rotationDegrees: textRotation,
-          name: overlayName,
-        });
-      }, object);
+      await runOverlayPlacement(
+        'text',
+        async () => {
+          await applyRasterOverlay({
+            camera,
+            root: object,
+            targetMesh: mesh,
+            pointWorld,
+            face: overlayFace,
+            canvas: textCanvas,
+            size: textSize,
+            rotationDegrees: textRotation,
+            name: overlayName,
+          });
+        },
+        object
+      );
     } catch (error) {
       enqueueSnackbar(error.toString(), { variant: 'warning' });
     }
   };
 
-  const handleImageFileChange = React.useCallback(async (uploadedFile: File) => {
-    try {
-      const canvas = await createImageCanvas(uploadedFile);
-      setImageCanvas(canvas);
-      setImageFile(uploadedFile);
-      setImageName(uploadedFile.name);
-    } catch (error) {
-      enqueueSnackbar(error.toString(), { variant: 'error' });
-    }
-  }, []);
+  const handleImageFileChange = React.useCallback(
+    async (uploadedFile: File) => {
+      try {
+        const canvas = await createImageCanvas(uploadedFile);
+        setImageCanvas(canvas);
+        setImageFile(uploadedFile);
+        setImageName(uploadedFile.name);
+      } catch (error) {
+        enqueueSnackbar(error.toString(), { variant: 'error' });
+      }
+    },
+    []
+  );
 
   const handlePointerMoveModel = (e: ThreeEvent<PointerEvent>) => {
     if (
@@ -787,7 +837,10 @@ export default function Editor({ examplePath, onSettingsChange }: Props) {
           size: imageSize,
           url: imagePreviewUrl,
         }
-      : activePanel === 'text' && mode === 'text' && textCanvas && textPreviewUrl
+      : activePanel === 'text' &&
+          mode === 'text' &&
+          textCanvas &&
+          textPreviewUrl
         ? {
             canvas: textCanvas,
             rotationDegrees: textRotation,
@@ -898,7 +951,11 @@ export default function Editor({ examplePath, onSettingsChange }: Props) {
           height: '100%',
           p: { xs: 2, md: 3 },
           display: 'grid',
-          gridTemplateColumns: { xs: '1fr', lg: 'minmax(0, 1fr) 390px', xl: 'minmax(0, 1fr) 420px' },
+          gridTemplateColumns: {
+            xs: '1fr',
+            lg: 'minmax(0, 1fr) 390px',
+            xl: 'minmax(0, 1fr) 420px',
+          },
           gridTemplateRows: { xs: 'minmax(420px, 1fr) auto', lg: '1fr' },
           gap: { xs: 2, md: 3 },
           overflow: { xs: 'auto', lg: 'hidden' },
@@ -1059,7 +1116,10 @@ export default function Editor({ examplePath, onSettingsChange }: Props) {
               {object && (
                 <ThreeJsCanvas
                   ref={canvasControlsRef}
-                  continuousPaint={activePanel === 'materials' && (mode === 'mesh' || mode === 'triangle')}
+                  continuousPaint={
+                    activePanel === 'materials' &&
+                    (mode === 'mesh' || mode === 'triangle')
+                  }
                   geometry={object}
                   onModelReady={handleModelReady}
                   onSelect={handleSelect}
@@ -1404,8 +1464,7 @@ function solveLinearSystem(matrix: number[][], values: number[]) {
 
     for (let row = pivot + 1; row < size; row += 1) {
       if (
-        Math.abs(augmented[row][pivot]) >
-        Math.abs(augmented[maxRow][pivot])
+        Math.abs(augmented[row][pivot]) > Math.abs(augmented[maxRow][pivot])
       ) {
         maxRow = row;
       }
@@ -1478,9 +1537,9 @@ function persistEditorSettings(settings: Settings) {
   }
 }
 
-function normalizeEditorMode(mode: Settings['mode'] | string | undefined):
-  | Mode
-  | undefined {
+function normalizeEditorMode(
+  mode: Settings['mode'] | string | undefined
+): Mode | undefined {
   if (mode === 'triangle_neighbors') {
     return 'triangle';
   }
@@ -1536,9 +1595,5 @@ function shouldIgnoreEditorShortcut(event: KeyboardEvent) {
 
   const tagName = target.tagName;
 
-  return (
-    tagName === 'INPUT' ||
-    tagName === 'TEXTAREA' ||
-    tagName === 'SELECT'
-  );
+  return tagName === 'INPUT' || tagName === 'TEXTAREA' || tagName === 'SELECT';
 }
