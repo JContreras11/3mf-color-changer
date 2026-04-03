@@ -26,6 +26,8 @@ type Props = ThreeElements['group'] & {
 };
 
 const defaultCameraPosition = new THREE.Vector3(6, 6, 6);
+const initialViewTilt = -10 * THREE.MathUtils.DEG2RAD;
+const initialViewZoomStep = 0.4;
 
 const ThreeJsCanvas = React.forwardRef<ThreeJsCanvasHandle, Props>(
   function ThreeJsCanvas(
@@ -75,6 +77,8 @@ const ThreeJsCanvas = React.forwardRef<ThreeJsCanvasHandle, Props>(
         true
       );
       await cameraControlRef.current.fitToSphere(geometry, true);
+      await cameraControlRef.current.rotate(0, initialViewTilt, true);
+      await cameraControlRef.current.zoom(initialViewZoomStep, true);
     }, [geometry]);
 
     const handleModelReady = React.useCallback(() => {
