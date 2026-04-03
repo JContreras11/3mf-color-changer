@@ -15,6 +15,11 @@ export type AddonOption = {
   family: CapFamily;
   id: string;
   path: string;
+  previewImages?: {
+    front?: string;
+    side?: string;
+  };
+  relatedPaths?: string[];
   subtitle: string;
   title: string;
 };
@@ -24,33 +29,68 @@ export const TRUCKER_ADDON_OPTIONS: AddonOption[] = [
     id: 'base',
     title: 'Base',
     subtitle: 'Base cap only',
-    path: 'examples/trucker_cap.3mf',
+    path: 'examples/trucker/Trucker Cap Base.3mf',
     artwork: 'base',
     family: 'trucker',
+    relatedPaths: [
+      'examples/trucker/Trucker Cap Base.3mf',
+      'examples/trucker/Trucker Cap Base A1.3mf',
+      'examples/trucker_cap.3mf',
+    ],
   },
   {
     id: 'deer-antlers-gold',
     title: 'Deer Antlers Gold',
     subtitle: 'Trucker-only variation',
-    path: 'examples/Cuernos/Deer Antlers G.3mf',
+    path: 'examples/trucker/Deer Antlers G.3mf',
     artwork: 'deer_gold',
     family: 'trucker',
+    previewImages: {
+      side: '/caps/addons/trucker/trucker_deer_side.png',
+      front: '/caps/addons/trucker/trucker_deer_front.png',
+    },
+    relatedPaths: [
+      'examples/trucker/Deer Antlers G.3mf',
+      'examples/trucker/Deer Antlers G A1.3mf',
+      'examples/cuernos/Deer Antlers G.3mf',
+      'examples/cuernos/Deer Antlers G A1.3mf',
+    ],
   },
   {
     id: 'deer-antlers-natural',
     title: 'Deer Antlers Natural',
     subtitle: 'Trucker-only variation',
-    path: 'examples/Cuernos/Deer Antlers P.3mf',
+    path: 'examples/trucker/Deer Antlers P.3mf',
     artwork: 'deer_natural',
     family: 'trucker',
+    previewImages: {
+      side: '/caps/addons/trucker/trucker_deer_side.png',
+      front: '/caps/addons/trucker/trucker_deer_front.png',
+    },
+    relatedPaths: [
+      'examples/trucker/Deer Antlers P.3mf',
+      'examples/trucker/Deer Antlers P A1.3mf',
+      'examples/cuernos/Deer Antlers P.3mf',
+      'examples/cuernos/Deer Antlers P A1.3mf',
+    ],
   },
   {
     id: 'viking-horns',
     title: 'Viking Horns',
     subtitle: 'Trucker-only variation',
-    path: 'examples/Cuernos/Viking Horns.3mf',
+    path: 'examples/trucker/Viking Horns.3mf',
     artwork: 'viking',
     family: 'trucker',
+    previewImages: {
+      side: '/caps/addons/trucker/trucker_horns_side.png',
+      front: '/caps/addons/trucker/trucker_horns_front.png',
+    },
+    relatedPaths: [
+      'examples/trucker/Viking Horns.3mf',
+      'examples/trucker/Viking Horns A1.3mf',
+      'examples/cuernos/Viking Horns.3mf',
+      'examples/cuernos/Viking Horns A1.3mf',
+    ],
   },
 ];
 
@@ -61,7 +101,9 @@ export function getCapFamily(file: File | string | undefined): CapFamily {
   if (
     normalized.includes('trucker_cap') ||
     normalized.includes('trucker cap') ||
-    normalized.includes('/cuernos/')
+    normalized.includes('/cuernos/') ||
+    normalized.includes('/trucker/') ||
+    matchesAddonPath(normalized, TRUCKER_ADDON_OPTIONS)
   ) {
     return 'trucker';
   }
@@ -97,34 +139,29 @@ export function getSelectedAddonId(file: File | string | undefined) {
 
   const normalized = file.toLowerCase();
 
-  if (
-    normalized.includes('deer antlers g') ||
-    normalized.includes('deer-antlers-gold')
-  ) {
-    return 'deer-antlers-gold';
+  const matchedAddon = TRUCKER_ADDON_OPTIONS.find((option) =>
+    optionPathMatches(option, normalized)
+  );
+
+  if (matchedAddon) {
+    return matchedAddon.id;
   }
 
-  if (
-    normalized.includes('deer antlers p') ||
-    normalized.includes('deer-antlers-natural')
-  ) {
-    return 'deer-antlers-natural';
-  }
-
-  if (
-    normalized.includes('viking horns') ||
-    normalized.includes('viking-horns')
-  ) {
-    return 'viking-horns';
-  }
-
-  if (
-    normalized.includes('trucker_cap') ||
-    normalized.includes('trucker cap base') ||
-    normalized.includes('/cuernos/')
-  ) {
+  if (normalized.includes('trucker_cap')) {
     return 'base';
   }
 
   return null;
+}
+
+function matchesAddonPath(normalizedFile: string, options: AddonOption[]) {
+  return options.some((option) => optionPathMatches(option, normalizedFile));
+}
+
+function optionPathMatches(option: AddonOption, normalizedFile: string) {
+  const candidates = [option.path, ...(option.relatedPaths || [])];
+
+  return candidates.some((candidate) =>
+    normalizedFile.includes(candidate.toLowerCase())
+  );
 }

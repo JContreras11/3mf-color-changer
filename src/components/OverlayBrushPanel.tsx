@@ -8,6 +8,7 @@ import RestartAltRoundedIcon from '@mui/icons-material/RestartAltRounded';
 import Button from '@mui/material/Button';
 import ButtonBase from '@mui/material/ButtonBase';
 import Divider from '@mui/material/Divider';
+import Image from 'next/image';
 import Paper from '@mui/material/Paper';
 import Slider from '@mui/material/Slider';
 import Stack from '@mui/material/Stack';
@@ -581,10 +582,18 @@ const OverlayBrushPanel = React.memo(function OverlayBrushPanel({
                           ? '0 12px 30px rgba(15, 23, 42, 0.04)'
                           : '0 18px 40px rgba(15, 23, 42, 0.08)',
                       },
+                      '&:hover .addon-preview-side': {
+                        opacity: optionDisabled || !option.previewImages?.front ? 1 : 0,
+                        transform: optionDisabled ? 'none' : 'scale(1.02)',
+                      },
+                      '&:hover .addon-preview-front': {
+                        opacity: optionDisabled || !option.previewImages?.front ? 0 : 1,
+                        transform: optionDisabled ? 'none' : 'scale(1.02)',
+                      },
                     }}
                   >
                     <Box sx={{ position: 'relative', mb: 2 }}>
-                      <AddonPreview artwork={option.artwork} />
+                      <AddonPreview option={option} />
                       {selected && (
                         <Box
                           sx={{
@@ -1181,7 +1190,123 @@ function InfoCard({
   );
 }
 
-function AddonPreview({ artwork }: { artwork: AddonArtwork }) {
+function AddonPreview({ option }: { option: AddonOption }) {
+  if (option.previewImages?.side || option.previewImages?.front) {
+    return <AddonImagePreview option={option} />;
+  }
+
+  return <AddonIllustratedPreview artwork={option.artwork} />;
+}
+
+function AddonImagePreview({ option }: { option: AddonOption }) {
+  const sideImage = option.previewImages?.side || option.previewImages?.front;
+  const frontImage = option.previewImages?.front;
+
+  return (
+    <Box
+      sx={{
+        position: 'relative',
+        aspectRatio: '1 / 0.86',
+        borderRadius: '26px',
+        overflow: 'hidden',
+        background:
+          'radial-gradient(circle at 20% 0%, rgba(255,255,255,0.98) 0%, rgba(245,247,252,0.96) 100%)',
+        border: `1px solid ${alpha('#e5e7eb', 0.82)}`,
+        boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.68)',
+        '& .addon-preview-image': {
+          transition: 'opacity 220ms ease, transform 220ms ease',
+        },
+        '& .addon-preview-front': {
+          opacity: 0,
+        },
+        '&:hover .addon-preview-side': {
+          opacity: frontImage ? 0 : 1,
+          transform: 'scale(1.02)',
+        },
+        '&:hover .addon-preview-front': {
+          opacity: frontImage ? 1 : 0,
+          transform: 'scale(1.02)',
+        },
+      }}
+    >
+      {sideImage && (
+        <Box
+          className="addon-preview-image addon-preview-side"
+          sx={{
+            position: 'absolute',
+            inset: 0,
+          }}
+        >
+          <Image
+            src={sideImage}
+            alt={`${option.title} side preview`}
+            fill
+            sizes="(max-width: 1200px) 50vw, 220px"
+            style={{ objectFit: 'contain' }}
+          />
+        </Box>
+      )}
+      {frontImage && (
+        <Box
+          className="addon-preview-image addon-preview-front"
+          sx={{
+            position: 'absolute',
+            inset: 0,
+          }}
+        >
+          <Image
+            src={frontImage}
+            alt={`${option.title} front preview`}
+            fill
+            sizes="(max-width: 1200px) 50vw, 220px"
+            style={{ objectFit: 'contain' }}
+          />
+        </Box>
+      )}
+
+      <Box
+        sx={{
+          position: 'absolute',
+          left: 10,
+          right: 10,
+          bottom: 10,
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          gap: 1,
+          pointerEvents: 'none',
+        }}
+      >
+        <PreviewBadge label="Side" />
+        {frontImage && <PreviewBadge label="Front on hover" />}
+      </Box>
+    </Box>
+  );
+}
+
+function PreviewBadge({ label }: { label: string }) {
+  return (
+    <Box
+      sx={{
+        px: 1.15,
+        py: 0.65,
+        borderRadius: '999px',
+        bgcolor: alpha('#ffffff', 0.82),
+        border: `1px solid ${alpha('#d8e2ff', 0.88)}`,
+        color: '#374151',
+        fontSize: 10,
+        fontWeight: 800,
+        letterSpacing: '0.14em',
+        textTransform: 'uppercase',
+        backdropFilter: 'blur(10px)',
+      }}
+    >
+      {label}
+    </Box>
+  );
+}
+
+function AddonIllustratedPreview({ artwork }: { artwork: AddonArtwork }) {
   const id = React.useId().replace(/:/g, '');
   const shadowId = `${id}-shadow`;
   const brimId = `${id}-brim`;
