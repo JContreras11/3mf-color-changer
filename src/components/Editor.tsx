@@ -158,19 +158,11 @@ export default function Editor({ examplePath, onSettingsChange }: Props) {
   const [isSceneReady, setIsSceneReady] = React.useState(false);
   const [, setSceneRevision] = React.useState(0);
   const canvasControlsRef = React.useRef<ThreeJsCanvasHandle | null>(null);
-  const shouldAutoFocusOnReadyRef = React.useRef(true);
   const editorRef = React.useRef<HTMLDivElement>(null);
   const undoStackRef = React.useRef<THREE.Object3D[]>([]);
   const redoStackRef = React.useRef<THREE.Object3D[]>([]);
   const paintStrokeActiveRef = React.useRef(false);
   const handleModelReady = React.useCallback(() => {
-    if (shouldAutoFocusOnReadyRef.current) {
-      shouldAutoFocusOnReadyRef.current = false;
-      requestAnimationFrame(() => {
-        canvasControlsRef.current?.focusModel();
-      });
-    }
-
     setIsSceneReady(true);
   }, []);
   const capFamily = React.useMemo(() => getCapFamily(file), [file]);
@@ -241,7 +233,6 @@ export default function Editor({ examplePath, onSettingsChange }: Props) {
   }, [mode, onSettingsChange, workingColor]);
 
   useEffect(() => {
-    shouldAutoFocusOnReadyRef.current = true;
     setIsSceneReady(false);
     setGhostOverlay(null);
   }, [file]);

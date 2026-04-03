@@ -7,7 +7,6 @@ import { Environment } from './Environment';
 import Model from './Model';
 
 export type ThreeJsCanvasHandle = {
-  focusModel: () => void;
   orbitLeft: () => void;
   resetView: () => void;
   zoomIn: () => void;
@@ -45,6 +44,11 @@ const ThreeJsCanvas = React.forwardRef<ThreeJsCanvasHandle, Props>(
   ) {
     const [mouseIsDown, setMouseIsDown] = React.useState(false);
     const cameraControlRef = React.useRef<CameraControls | null>(null);
+    const activeGeometryUuidRef = React.useRef(geometry.uuid);
+
+    React.useEffect(() => {
+      activeGeometryUuidRef.current = geometry.uuid;
+    }, [geometry.uuid]);
 
     const reconnectCameraControls = React.useCallback(() => {
       const canvasElement = document.getElementById('editor-canvas');
@@ -59,6 +63,8 @@ const ThreeJsCanvas = React.forwardRef<ThreeJsCanvasHandle, Props>(
         return;
       }
 
+      geometry.updateWorldMatrix(true, true);
+
       await cameraControlRef.current.setLookAt(
         defaultCameraPosition.x,
         defaultCameraPosition.y,
@@ -71,21 +77,31 @@ const ThreeJsCanvas = React.forwardRef<ThreeJsCanvasHandle, Props>(
       await cameraControlRef.current.fitToSphere(geometry, true);
     }, [geometry]);
 
-    const focusModel = React.useCallback(async () => {
-      if (!cameraControlRef.current) {
-        return;
-      }
+    const handleModelReady = React.useCallback(() => {
+      const geometryUuid = geometry.uuid;
 
-      await resetView();
-      await cameraControlRef.current.zoom(0.35, true);
-    }, [resetView]);
+      const runResetView = async () => {
+        await waitForAnimationFrames(2);
+
+        if (activeGeometryUuidRef.current !== geometryUuid) {
+          return;
+        }
+
+        await resetView();
+
+        if (activeGeometryUuidRef.current !== geometryUuid) {
+          return;
+        }
+
+        onModelReady?.();
+      };
+
+      void runResetView();
+    }, [geometry.uuid, onModelReady, resetView]);
 
     React.useImperativeHandle(
       ref,
       () => ({
-        focusModel: () => {
-          void focusModel();
-        },
         orbitLeft: () => {
           cameraControlRef.current?.rotate(25 * THREE.MathUtils.DEG2RAD, 0, true);
           cameraControlRef.current?.fitToSphere(geometry, true);
@@ -100,7 +116,7 @@ const ThreeJsCanvas = React.forwardRef<ThreeJsCanvasHandle, Props>(
           cameraControlRef.current?.zoom(-0.4, true);
         },
       }),
-      [focusModel, geometry, resetView]
+      [geometry, resetView]
     );
 
     const handleClick = (e) => {
@@ -173,7 +189,7 @@ const ThreeJsCanvas = React.forwardRef<ThreeJsCanvasHandle, Props>(
         <Environment showGrid={showGroundGrid} />
         <Model
           geometry={geometry}
-          onReady={onModelReady}
+          onReady={handleModelReady}
           onClick={handleClick}
           onPointerDown={handlePointerDown}
           onPointerUp={handlePointerUp}
@@ -208,3 +224,20 @@ const ThreeJsCanvas = React.forwardRef<ThreeJsCanvasHandle, Props>(
 );
 
 export default ThreeJsCanvas;
+
+function waitForAnimationFrames(count: number) {
+  return new Promise<void>((resolve) => {
+    const step = (remaining: number) => {
+      if (remaining <= 0) {
+        resolve();
+        return;
+      }
+
+      window.requestAnimationFrame(() => {
+        step(remaining - 1);
+      });
+    };
+
+    step(count);
+  });
+}
