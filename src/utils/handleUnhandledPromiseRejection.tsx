@@ -8,11 +8,17 @@ import React from 'react';
 
 import config from '../etc/config.json';
 
-export default function handleUnhandledPromiseRejection(promiseRejectionEvent) {
+export default function handleUnhandledPromiseRejection(
+  promiseRejectionEvent: PromiseRejectionEvent
+) {
+  const rejectionMessage = getPromiseRejectionMessage(
+    promiseRejectionEvent?.reason
+  );
+
   const msg = (
     <div>
       <Typography variant="body1">
-        <i>{promiseRejectionEvent.reason.toString()}</i>
+        <i>{rejectionMessage}</i>
       </Typography>
       <Divider sx={{ my: 1 }} />
       <Typography variant="body1">
@@ -46,4 +52,34 @@ export default function handleUnhandledPromiseRejection(promiseRejectionEvent) {
       </Stack>
     ),
   });
+}
+
+function getPromiseRejectionMessage(reason: unknown) {
+  if (reason instanceof Error) {
+    return reason.message || reason.toString();
+  }
+
+  if (typeof reason === 'string') {
+    return reason;
+  }
+
+  if (reason === undefined) {
+    return 'Unhandled promise rejection without a reason.';
+  }
+
+  if (reason === null) {
+    return 'Unhandled promise rejection with a null reason.';
+  }
+
+  try {
+    const serializedReason = JSON.stringify(reason);
+
+    if (serializedReason) {
+      return serializedReason;
+    }
+  } catch {
+    // Fall through to String(reason).
+  }
+
+  return String(reason);
 }

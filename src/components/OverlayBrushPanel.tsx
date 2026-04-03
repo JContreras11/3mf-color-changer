@@ -1263,45 +1263,6 @@ function AddonImagePreview({ option }: { option: AddonOption }) {
           />
         </Box>
       )}
-
-      <Box
-        sx={{
-          position: 'absolute',
-          left: 10,
-          right: 10,
-          bottom: 10,
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          gap: 1,
-          pointerEvents: 'none',
-        }}
-      >
-        <PreviewBadge label="Side" />
-        {frontImage && <PreviewBadge label="Front on hover" />}
-      </Box>
-    </Box>
-  );
-}
-
-function PreviewBadge({ label }: { label: string }) {
-  return (
-    <Box
-      sx={{
-        px: 1.15,
-        py: 0.65,
-        borderRadius: '999px',
-        bgcolor: alpha('#ffffff', 0.82),
-        border: `1px solid ${alpha('#d8e2ff', 0.88)}`,
-        color: '#374151',
-        fontSize: 10,
-        fontWeight: 800,
-        letterSpacing: '0.14em',
-        textTransform: 'uppercase',
-        backdropFilter: 'blur(10px)',
-      }}
-    >
-      {label}
     </Box>
   );
 }

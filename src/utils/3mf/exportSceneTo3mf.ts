@@ -15,6 +15,9 @@ const MATERIAL_NS =
   'http://schemas.microsoft.com/3dmanufacturing/material/2015/02';
 const OVERLAY_EXPORT_THICKNESS = 0.5;
 const POSITION_PRECISION = 1e-6;
+const ZIP_STORE_OPTIONS = {
+  level: 0,
+} as const;
 
 export default async function exportSceneTo3mf(
   object: THREE.Object3D,
@@ -28,10 +31,19 @@ export default async function exportSceneTo3mf(
 
   await zipWriter.add(
     '[Content_Types].xml',
-    new TextReader(createContentTypesXml())
+    new TextReader(createContentTypesXml()),
+    ZIP_STORE_OPTIONS
   );
-  await zipWriter.add('_rels/.rels', new TextReader(createRelationshipsXml()));
-  await zipWriter.add('3D/3dmodel.model', new TextReader(modelXml));
+  await zipWriter.add(
+    '_rels/.rels',
+    new TextReader(createRelationshipsXml()),
+    ZIP_STORE_OPTIONS
+  );
+  await zipWriter.add(
+    '3D/3dmodel.model',
+    new TextReader(modelXml),
+    ZIP_STORE_OPTIONS
+  );
   await zipWriter.close();
 
   return zipFileWriter.getData();

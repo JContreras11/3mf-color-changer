@@ -32,6 +32,10 @@ export const TRUCKER_ADDON_OPTIONS: AddonOption[] = [
     path: 'examples/trucker/Trucker Cap Base.3mf',
     artwork: 'base',
     family: 'trucker',
+    previewImages: {
+      side: '/caps/addons/trucker/trucker_base_side.webp',
+      front: '/caps/addons/trucker/trucker_base_front.webp',
+    },
     relatedPaths: [
       'examples/trucker/Trucker Cap Base.3mf',
       'examples/trucker/Trucker Cap Base A1.3mf',
@@ -64,8 +68,8 @@ export const TRUCKER_ADDON_OPTIONS: AddonOption[] = [
     artwork: 'deer_natural',
     family: 'trucker',
     previewImages: {
-      side: '/caps/addons/trucker/trucker_deer_side.png',
-      front: '/caps/addons/trucker/trucker_deer_front.png',
+      side: '/caps/addons/trucker/trucker_mini_deer_side.webp',
+      front: '/caps/addons/trucker/trucker_mini_deer_front.webp',
     },
     relatedPaths: [
       'examples/trucker/Deer Antlers P.3mf',
