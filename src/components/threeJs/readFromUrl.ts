@@ -1,18 +1,37 @@
-import type * as THREE from 'three';
+import { FileLoader, type Group, type Object3DEventMap } from 'three';
+
 import { ThreeMFLoader } from '../../utils/threejs/PatchedThreeMFLoader.js';
 
-export default async function readFromUrl(
+export default function readFromUrl(
   url: string
-): Promise<THREE.Group<THREE.Object3DEventMap>> {
-  const response = await fetch(encodeURI(url));
+): Promise<Group<Object3DEventMap>> {
+  return new Promise((resolve, reject) => {
+    const loader = new FileLoader();
 
-  if (!response.ok) {
-    throw new Error('Could not load 3MF file');
+    loader.setResponseType('arraybuffer');
+    loader.load(
+      encodeURI(url),
+      (data) => {
+        try {
+          const threeMfLoader = new ThreeMFLoader();
+          const object = threeMfLoader.parse(data as ArrayBuffer);
+          resolve(object);
+        } catch (error) {
+          reject(normalizeLoadError(error));
+        }
+      },
+      undefined,
+      (error) => {
+        reject(normalizeLoadError(error));
+      }
+    );
+  });
+}
+
+function normalizeLoadError(error: unknown): Error {
+  if (error instanceof Error) {
+    return error;
   }
 
-  const contents = await response.arrayBuffer();
-  const loader = new ThreeMFLoader();
-  const object = loader.parse(contents);
-
-  return object;
+  return new Error('Could not load 3MF file.');
 }
