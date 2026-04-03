@@ -1,7 +1,6 @@
 'use client';
 
 import ArrowForwardRoundedIcon from '@mui/icons-material/ArrowForwardRounded';
-import CloudUploadRoundedIcon from '@mui/icons-material/CloudUploadRounded';
 import LockRoundedIcon from '@mui/icons-material/LockRounded';
 import LogoutRoundedIcon from '@mui/icons-material/LogoutRounded';
 import Box from '@mui/material/Box';
@@ -19,7 +18,6 @@ import React from 'react';
 import { useAuth } from './AuthContext';
 import { useEditorFile } from './EditorFileContext';
 import { useExportReview } from './ExportReviewContext';
-import FileDrop from './FileDrop';
 import LoginDialog from './LoginDialog';
 import PermanentDrawer from './PermanentDrawer';
 
@@ -59,7 +57,7 @@ export default function HomeRoute() {
     logout,
     username,
   } = useAuth();
-  const { clearUploadedFile, setUploadedFile } = useEditorFile();
+  const { clearUploadedFile } = useEditorFile();
   const { clearReviewData } = useExportReview();
   const [selectedCapId, setSelectedCapId] = React.useState('trucker-cap');
   const [isLoginOpen, setIsLoginOpen] = React.useState(false);
@@ -170,15 +168,6 @@ export default function HomeRoute() {
     [clearReviewData, clearUploadedFile, getEditorRoute, router]
   );
 
-  const handleFileChange = React.useCallback(
-    (file: File) => {
-      clearReviewData();
-      setUploadedFile(file);
-      router.push('/editor');
-    },
-    [clearReviewData, router, setUploadedFile]
-  );
-
   const handleCapActivate = React.useCallback(
     (cap: CapOption) => {
       if (cap.disabled || isAuthLoading) {
@@ -223,19 +212,6 @@ export default function HomeRoute() {
       openLoginDialog,
     ]
   );
-
-  const handleUploadLocked = React.useCallback(() => {
-    if (isAuthLoading) {
-      return;
-    }
-
-    openLoginDialog({
-      description:
-        'Sign in before uploading a private 3MF template. Upload access is only enabled for authenticated studio sessions.',
-      route: null,
-      title: 'Login to Upload 3MF',
-    });
-  }, [isAuthLoading, openLoginDialog]);
 
   const handleLoginAuthenticated = React.useCallback(() => {
     setIsLoginOpen(false);

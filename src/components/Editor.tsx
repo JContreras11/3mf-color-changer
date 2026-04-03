@@ -28,6 +28,11 @@ import {
 } from '../etc/designCatalog';
 import { generateExportFile } from '../jobs/exportFile';
 import { createExportReviewData } from '../utils/exportReview';
+import {
+  applyTruckerCapPreset,
+  TRUCKER_COLOR_PRESETS,
+  type TruckerColorSections,
+} from '../utils/truckerCapPresets';
 import applyRasterOverlay from '../utils/threejs/applyRasterOverlay';
 import changeFaceColor from '../utils/threejs/changeFaceColor';
 import changeMeshColor from '../utils/threejs/changeMeshColor';
@@ -153,11 +158,19 @@ export default function Editor({ examplePath, onSettingsChange }: Props) {
   const [isSceneReady, setIsSceneReady] = React.useState(false);
   const [, setSceneRevision] = React.useState(0);
   const canvasControlsRef = React.useRef<ThreeJsCanvasHandle | null>(null);
+  const shouldAutoFocusOnReadyRef = React.useRef(true);
   const editorRef = React.useRef<HTMLDivElement>(null);
   const undoStackRef = React.useRef<THREE.Object3D[]>([]);
   const redoStackRef = React.useRef<THREE.Object3D[]>([]);
   const paintStrokeActiveRef = React.useRef(false);
   const handleModelReady = React.useCallback(() => {
+    if (shouldAutoFocusOnReadyRef.current) {
+      shouldAutoFocusOnReadyRef.current = false;
+      requestAnimationFrame(() => {
+        canvasControlsRef.current?.focusModel();
+      });
+    }
+
     setIsSceneReady(true);
   }, []);
   const capFamily = React.useMemo(() => getCapFamily(file), [file]);
@@ -228,6 +241,7 @@ export default function Editor({ examplePath, onSettingsChange }: Props) {
   }, [mode, onSettingsChange, workingColor]);
 
   useEffect(() => {
+    shouldAutoFocusOnReadyRef.current = true;
     setIsSceneReady(false);
     setGhostOverlay(null);
   }, [file]);
@@ -754,6 +768,25 @@ export default function Editor({ examplePath, onSettingsChange }: Props) {
     handleModeChange('mesh');
   }, [handleModeChange, initialWorkingColor]);
 
+  const handleApplyTruckerPreset = React.useCallback(
+    (sections: TruckerColorSections) => {
+      if (!object) {
+        return;
+      }
+
+      performSyncSceneMutation(() => {
+        const applied = applyTruckerCapPreset(object, sections);
+
+        if (!applied) {
+          throw new Error(
+            'The current 3MF layout could not be matched to the trucker cap section presets.'
+          );
+        }
+      });
+    },
+    [object, performSyncSceneMutation]
+  );
+
   const handleResetGraphics = React.useCallback(() => {
     setImageCanvas(null);
     setImageFile(null);
@@ -1248,6 +1281,7 @@ export default function Editor({ examplePath, onSettingsChange }: Props) {
             mode={mode}
             onAddonSelect={handleAddonSelect}
             onApplyGraphics={handleApplyGraphics}
+            onApplyTruckerPreset={handleApplyTruckerPreset}
             onApplyText={handleApplyText}
             onColorChange={handleWorkingColorChange}
             onImageRotationChange={setImageRotation}
@@ -1261,9 +1295,11 @@ export default function Editor({ examplePath, onSettingsChange }: Props) {
             onTextRotationChange={setTextRotation}
             onTextSizeChange={setTextSize}
             selectedAddonId={canUseCuratedAddons ? selectedAddonId : null}
+            showTruckerPresets={capFamily === 'trucker'}
             text={textValue}
             textRotation={textRotation}
             textSize={textSize}
+            truckerPresets={TRUCKER_COLOR_PRESETS}
           />
         </Box>
       </Box>

@@ -32,28 +32,28 @@ type Props = {
 
 const panelItems = [
   {
-    id: 'materials',
-    label: 'Materials',
-    icon: PaletteOutlinedIcon,
-    tooltip: 'Paint the cap, edit color details, or sample a color from the model.',
+    id: 'objects',
+    label: 'Addons',
+    icon: ExtensionRoundedIcon,
+    tooltip: 'Swap into curated 3MF accessory variations for this silhouette.',
   },
   {
     id: 'graphics',
-    label: 'Graphics',
+    label: 'Graphic',
     icon: ImageRoundedIcon,
     tooltip: 'Upload logos or images and place them on the cap.',
-  },
-  {
-    id: 'objects',
-    label: 'Objects',
-    icon: ExtensionRoundedIcon,
-    tooltip: 'Swap into curated 3MF accessory variations for this silhouette.',
   },
   {
     id: 'text',
     label: 'Text',
     icon: TextFieldsRoundedIcon,
     tooltip: 'Add editable text to the selected surface.',
+  },
+  {
+    id: 'materials',
+    label: 'Materials',
+    icon: PaletteOutlinedIcon,
+    tooltip: 'Paint the cap, edit color details, or sample a color from the model.',
   },
 ] as const satisfies readonly {
   icon: typeof PaletteOutlinedIcon;
@@ -115,38 +115,38 @@ const ModeSelector = React.memo(function ModeSelector({
                   },
                 }}
               >
-              <Box
-                sx={{
-                  width: { xs: 46, md: 52 },
-                  height: { xs: 46, md: 52 },
-                  borderRadius: '50%',
-                  display: 'grid',
-                  placeItems: 'center',
-                  background: active
-                    ? 'linear-gradient(145deg, #0058bc 0%, #0f6fe3 100%)'
-                    : alpha('#edf1f7', 0.95),
-                  color: active ? '#ffffff' : '#414755',
-                  boxShadow: active
-                    ? '0 18px 32px rgba(0, 88, 188, 0.24)'
-                    : 'inset 0 0 0 1px rgba(193, 198, 215, 0.28)',
-                }}
-              >
-                <Icon sx={{ fontSize: { xs: 22, md: 24 } }} />
-              </Box>
-              <Typography
-                sx={{
-                  fontSize: { xs: 9, md: 10 },
-                  fontWeight: active ? 800 : 600,
-                  letterSpacing: '0.24em',
-                  textTransform: 'uppercase',
-                  color: active ? '#0058bc' : alpha('#414755', 0.62),
-                  lineHeight: 1.4,
-                  textAlign: 'center',
-                }}
-              >
-                {item.label}
-              </Typography>
-            </ButtonBase>
+                <Box
+                  sx={{
+                    width: { xs: 46, md: 52 },
+                    height: { xs: 46, md: 52 },
+                    borderRadius: '50%',
+                    display: 'grid',
+                    placeItems: 'center',
+                    background: active
+                      ? 'linear-gradient(145deg, #0058bc 0%, #0f6fe3 100%)'
+                      : alpha('#edf1f7', 0.95),
+                    color: active ? '#ffffff' : '#414755',
+                    boxShadow: active
+                      ? '0 18px 32px rgba(0, 88, 188, 0.24)'
+                      : 'inset 0 0 0 1px rgba(193, 198, 215, 0.28)',
+                  }}
+                >
+                  <Icon sx={{ fontSize: { xs: 22, md: 24 } }} />
+                </Box>
+                <Typography
+                  sx={{
+                    fontSize: { xs: 9, md: 10 },
+                    fontWeight: active ? 800 : 600,
+                    letterSpacing: '0.24em',
+                    textTransform: 'uppercase',
+                    color: active ? '#0058bc' : alpha('#414755', 0.62),
+                    lineHeight: 1.4,
+                    textAlign: 'center',
+                  }}
+                >
+                  {item.label}
+                </Typography>
+              </ButtonBase>
             </Box>
           </Tooltip>
         );

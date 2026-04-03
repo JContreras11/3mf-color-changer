@@ -19,6 +19,10 @@ import React from 'react';
 import { HexColorPicker } from 'react-colorful';
 
 import type { AddonArtwork, AddonOption } from '../etc/designCatalog';
+import type {
+  TruckerColorPreset,
+  TruckerColorSections,
+} from '../utils/truckerCapPresets';
 import { DesignPanel, Mode } from './ModeSelector';
 
 type Props = {
@@ -34,6 +38,7 @@ type Props = {
   mode: Mode;
   onAddonSelect: (option: AddonOption) => void;
   onApplyGraphics: () => void;
+  onApplyTruckerPreset: (sections: TruckerColorSections) => void;
   onApplyText: () => void;
   onColorChange: (color: string) => void;
   onImageRotationChange: (value: number) => void;
@@ -47,9 +52,11 @@ type Props = {
   onTextRotationChange: (value: number) => void;
   onTextSizeChange: (value: number) => void;
   selectedAddonId?: string | null;
+  showTruckerPresets?: boolean;
   text: string;
   textRotation: number;
   textSize: number;
+  truckerPresets: readonly TruckerColorPreset[];
 };
 
 const paletteColors = [
@@ -101,6 +108,7 @@ const OverlayBrushPanel = React.memo(function OverlayBrushPanel({
   mode,
   onAddonSelect,
   onApplyGraphics,
+  onApplyTruckerPreset,
   onApplyText,
   onColorChange,
   onImageRotationChange,
@@ -114,17 +122,46 @@ const OverlayBrushPanel = React.memo(function OverlayBrushPanel({
   onTextRotationChange,
   onTextSizeChange,
   selectedAddonId,
+  showTruckerPresets = false,
   text,
   textRotation,
   textSize,
+  truckerPresets,
 }: Props) {
   const inputRef = React.useRef<HTMLInputElement>(null);
   const copy = panelCopy[activePanel];
+  const [hexDraft, setHexDraft] = React.useState(color.toUpperCase());
+
+  React.useEffect(() => {
+    setHexDraft(color.toUpperCase());
+  }, [color]);
 
   const openImagePicker = () => {
     if (!disabled) {
       inputRef.current?.click();
     }
+  };
+
+  const handleHexChange = (nextValue: string) => {
+    setHexDraft(nextValue.toUpperCase());
+
+    const normalizedHex = normalizeHexColor(nextValue);
+
+    if (normalizedHex) {
+      onColorChange(normalizedHex);
+    }
+  };
+
+  const syncHexDraft = () => {
+    const normalizedHex = normalizeHexColor(hexDraft);
+
+    if (normalizedHex) {
+      setHexDraft(normalizedHex.toUpperCase());
+      onColorChange(normalizedHex);
+      return;
+    }
+
+    setHexDraft(color.toUpperCase());
   };
 
   return (
@@ -326,7 +363,89 @@ const OverlayBrushPanel = React.memo(function OverlayBrushPanel({
               <Box sx={{ display: 'flex', justifyContent: 'center' }}>
                 <HexColorPicker color={color} onChange={onColorChange} />
               </Box>
+              <TextField
+                disabled={disabled}
+                label="Hex"
+                value={hexDraft}
+                onChange={(event) => handleHexChange(event.target.value)}
+                onBlur={syncHexDraft}
+                placeholder="#FFFFFF"
+                fullWidth
+                sx={{ mt: 2.25 }}
+                InputLabelProps={{ shrink: true }}
+                inputProps={{
+                  autoCapitalize: 'characters',
+                  spellCheck: false,
+                }}
+                InputProps={{
+                  sx: {
+                    bgcolor: alpha('#ffffff', 0.82),
+                    borderRadius: '16px',
+                    fontWeight: 700,
+                    letterSpacing: '0.04em',
+                  },
+                  startAdornment: (
+                    <Box
+                      sx={{
+                        width: 18,
+                        height: 18,
+                        borderRadius: '6px',
+                        bgcolor: color,
+                        border: `1px solid ${alpha('#c1c6d7', 0.72)}`,
+                        mr: 1.25,
+                        flexShrink: 0,
+                      }}
+                    />
+                  ),
+                }}
+              />
             </Box>
+
+            {showTruckerPresets && truckerPresets.length > 0 && (
+              <Box
+                sx={{
+                  p: 2.25,
+                  borderRadius: '24px',
+                  bgcolor: alpha('#ffffff', 0.94),
+                  border: `1px solid ${alpha('#d8e2ff', 0.92)}`,
+                  boxShadow: '0 18px 36px rgba(15, 23, 42, 0.04)',
+                }}
+              >
+                <Typography
+                  sx={{
+                    fontSize: 12,
+                    fontWeight: 800,
+                    letterSpacing: '0.24em',
+                    textTransform: 'uppercase',
+                    color: '#6b7280',
+                    mb: 0.9,
+                  }}
+                >
+                  Quick trucker combos
+                </Typography>
+                <Typography
+                  sx={{
+                    color: '#4b5563',
+                    fontSize: 13,
+                    lineHeight: 1.6,
+                    mb: 2,
+                  }}
+                >
+                  Apply three coordinated colors at once: crown/back, front panel,
+                  and visor.
+                </Typography>
+                <Stack spacing={1.35}>
+                  {truckerPresets.map((preset) => (
+                    <TruckerPresetButton
+                      key={preset.id}
+                      disabled={disabled}
+                      preset={preset}
+                      onClick={() => onApplyTruckerPreset(preset.sections)}
+                    />
+                  ))}
+                </Stack>
+              </Box>
+            )}
 
             <InfoCard
               icon={<FormatColorFillRoundedIcon sx={{ fontSize: 20 }} />}
@@ -738,6 +857,139 @@ function ModeOptionGroup({
       })}
     </Stack>
   );
+}
+
+function TruckerPresetButton({
+  disabled = false,
+  onClick,
+  preset,
+}: {
+  disabled?: boolean;
+  onClick: () => void;
+  preset: TruckerColorPreset;
+}) {
+  const swatches = [
+    {
+      color: preset.sections.crown,
+      label: 'Crown',
+    },
+    {
+      color: preset.sections.front,
+      label: 'Front',
+    },
+    {
+      color: preset.sections.brim,
+      label: 'Brim',
+    },
+  ] as const;
+
+  return (
+    <ButtonBase
+      disabled={disabled}
+      onClick={onClick}
+      sx={{
+        width: '100%',
+        p: 1.7,
+        borderRadius: '20px',
+        textAlign: 'left',
+        justifyContent: 'flex-start',
+        bgcolor: alpha('#f8f9fa', 0.92),
+        border: `1px solid ${alpha('#d8e2ff', 0.88)}`,
+        transition:
+          'transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease',
+        '&:hover': {
+          transform: disabled ? 'none' : 'translateY(-1px)',
+          borderColor: disabled ? alpha('#d8e2ff', 0.88) : alpha('#0058bc', 0.38),
+          boxShadow: disabled
+            ? 'none'
+            : '0 14px 30px rgba(0, 88, 188, 0.08)',
+        },
+      }}
+    >
+      <Stack direction="row" spacing={1.5} alignItems="center" sx={{ width: '100%' }}>
+        <Stack direction="row" spacing={0.7} alignItems="center">
+          {swatches.map((swatch) => (
+            <TooltipSwatch
+              key={swatch.label}
+              color={swatch.color}
+              label={swatch.label}
+            />
+          ))}
+        </Stack>
+        <Box sx={{ minWidth: 0 }}>
+          <Typography
+            sx={{
+              fontFamily: '"Manrope", "Inter", sans-serif',
+              fontWeight: 800,
+              color: '#111827',
+              lineHeight: 1.2,
+            }}
+          >
+            {preset.label}
+          </Typography>
+          <Typography
+            sx={{
+              color: '#6b7280',
+              fontSize: 12.5,
+              lineHeight: 1.5,
+              mt: 0.45,
+            }}
+          >
+            {preset.description}
+          </Typography>
+        </Box>
+      </Stack>
+    </ButtonBase>
+  );
+}
+
+function TooltipSwatch({ color, label }: { color: string; label: string }) {
+  return (
+    <Stack spacing={0.45} alignItems="center">
+      <Box
+        sx={{
+          width: 22,
+          height: 22,
+          borderRadius: '8px',
+          bgcolor: color,
+          border: `1px solid ${alpha('#c1c6d7', 0.74)}`,
+          boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.42)',
+        }}
+      />
+      <Typography
+        sx={{
+          fontSize: 9,
+          fontWeight: 700,
+          letterSpacing: '0.12em',
+          textTransform: 'uppercase',
+          color: '#6b7280',
+        }}
+      >
+        {label}
+      </Typography>
+    </Stack>
+  );
+}
+
+function normalizeHexColor(value: string) {
+  const normalized = value.trim().replace(/^#/, '');
+
+  if (/^[0-9a-fA-F]{3}$/.test(normalized)) {
+    return (
+      '#' +
+      normalized
+        .split('')
+        .map((character) => character + character)
+        .join('')
+        .toUpperCase()
+    );
+  }
+
+  if (/^[0-9a-fA-F]{6}$/.test(normalized)) {
+    return `#${normalized.toUpperCase()}`;
+  }
+
+  return null;
 }
 
 function SliderField({

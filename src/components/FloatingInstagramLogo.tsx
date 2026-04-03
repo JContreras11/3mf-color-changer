@@ -6,17 +6,17 @@ import { alpha } from '@mui/material/styles';
 import Image from 'next/image';
 import React from 'react';
 
-const INSTAGRAM_URL = 'https://www.instagram.com/3dxav/';
+const BRAND_LINKS_URL = 'https://linktr.ee/3dxav';
 
 export default function FloatingInstagramLogo() {
   return (
-    <Tooltip title="Follow 3DXAV on Instagram" arrow enterDelay={160}>
+    <Tooltip title="Open 3DXAV links" arrow enterDelay={160}>
       <Box
         component="a"
-        href={INSTAGRAM_URL}
+        href={BRAND_LINKS_URL}
         target="_blank"
         rel="noopener noreferrer"
-        aria-label="Open 3DXAV Instagram profile"
+        aria-label="Open 3DXAV Linktree"
         sx={{
           position: 'fixed',
           right: { xs: 18, sm: 22, md: 28 },
