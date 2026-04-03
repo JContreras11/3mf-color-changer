@@ -1,34 +1,42 @@
-import { FileLoader, type Group, type Object3DEventMap } from 'three';
+import type { Group, Object3DEventMap } from 'three';
 
 import { ThreeMFLoader } from '../../utils/threejs/PatchedThreeMFLoader.js';
+import { normalizeExamplePath } from '../../utils/examplePaths';
 
 export default function readFromUrl(
-  url: string
+  url: string,
+  options?: {
+    signal?: AbortSignal;
+  }
 ): Promise<Group<Object3DEventMap>> {
-  return new Promise((resolve, reject) => {
-    const loader = new FileLoader();
+  return loadFromUrl(url, options?.signal);
+}
 
-    loader.setResponseType('arraybuffer');
-    loader.load(
-      encodeURI(url),
-      (data) => {
-        try {
-          const threeMfLoader = new ThreeMFLoader();
-          const object = threeMfLoader.parse(data as ArrayBuffer);
-          resolve(object);
-        } catch (error) {
-          reject(normalizeLoadError(error));
-        }
-      },
-      undefined,
-      (error) => {
-        reject(normalizeLoadError(error));
-      }
-    );
+async function loadFromUrl(url: string, signal?: AbortSignal) {
+  const normalizedUrl = encodeURI(normalizeExamplePath(url));
+  const response = await fetch(normalizedUrl, {
+    cache: 'no-store',
+    signal,
   });
+
+  if (!response.ok) {
+    throw new Error('Could not load 3MF file.');
+  }
+
+  try {
+    const threeMfLoader = new ThreeMFLoader();
+    const data = await response.arrayBuffer();
+    return threeMfLoader.parse(data);
+  } catch (error) {
+    throw normalizeLoadError(error);
+  }
 }
 
 function normalizeLoadError(error: unknown): Error {
+  if (error instanceof DOMException && error.name === 'AbortError') {
+    return error;
+  }
+
   if (error instanceof Error) {
     return error;
   }

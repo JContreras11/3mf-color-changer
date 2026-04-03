@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 
 import readFromFile from './readFromFile';
 import readFromUrl from './readFromUrl';
+import { normalizeExamplePath } from '../../utils/examplePaths';
 
 type UseFileState = {
   error: Error | null;
@@ -19,16 +20,23 @@ export default function useFile(
   const [object, setObject] = useState<THREE.Object3D | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
+  const requestIdRef = useRef(0);
 
-  // TODO Somehow this useeffect is called twice although the file didn't change.
   useEffect(() => {
-    let ignore = false;
+    const requestId = requestIdRef.current + 1;
+    const abortController = new AbortController();
+    requestIdRef.current = requestId;
+
+    const isCurrentRequest = () =>
+      requestIdRef.current === requestId && !abortController.signal.aborted;
 
     if (!file) {
       setObject(null);
       setIsLoading(false);
       setError(null);
-      return;
+      return () => {
+        abortController.abort();
+      };
     }
 
     setObject(null);
@@ -40,9 +48,15 @@ export default function useFile(
         let nextObject;
 
         if (typeof file === 'string') {
-          nextObject = await readFromUrl(file);
+          nextObject = await readFromUrl(normalizeExamplePath(file), {
+            signal: abortController.signal,
+          });
         } else {
           nextObject = await readFromFile(file);
+        }
+
+        if (!isCurrentRequest()) {
+          return;
         }
 
         nextObject.rotation.set(-Math.PI / 2, 0, 0); // z-up conversion
@@ -91,22 +105,26 @@ export default function useFile(
           }
         });
 
-        if (!ignore) {
+        if (isCurrentRequest()) {
           setObject(nextObject);
         }
       } catch (error) {
-        if (!ignore) {
+        if (isAbortError(error) || !isCurrentRequest()) {
+          return;
+        }
+
+        if (isCurrentRequest()) {
           setError(normalizeLoadError(error));
         }
       } finally {
-        if (!ignore) {
+        if (isCurrentRequest()) {
           setIsLoading(false);
         }
       }
     })();
 
     return () => {
-      ignore = true;
+      abortController.abort();
     };
   }, [file]);
 
@@ -119,4 +137,8 @@ function normalizeLoadError(error: unknown): Error {
   }
 
   return new Error('Could not load 3MF file.');
+}
+
+function isAbortError(error: unknown) {
+  return error instanceof DOMException && error.name === 'AbortError';
 }

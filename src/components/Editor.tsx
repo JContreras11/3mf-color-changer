@@ -45,6 +45,7 @@ import {
   getRasterOverlayDimensions,
   getRasterOverlayPlacement,
 } from '../utils/threejs/rasterOverlayPlacement';
+import { normalizeExamplePath } from '../utils/examplePaths';
 import { useEditorFile } from './EditorFileContext';
 import { useExportReview } from './ExportReviewContext';
 import ModeSelector, { DesignPanel, Mode } from './ModeSelector';
@@ -125,9 +126,8 @@ export default function Editor({ examplePath, onSettingsChange }: Props) {
 
   const [object, setObject, fileState] = useFile(file);
   const [mode, setMode] = React.useState<Mode>(initialMode);
-  const [activePanel, setActivePanel] = React.useState<DesignPanel>(
-    getDesignPanelFromMode(initialMode)
-  );
+  const [activePanel, setActivePanel] =
+    React.useState<DesignPanel>('objects');
   const [workingColor, setWorkingColor] =
     React.useState<string>(initialWorkingColor);
   const [imageCanvas, setImageCanvas] =
@@ -838,7 +838,9 @@ export default function Editor({ examplePath, onSettingsChange }: Props) {
         return;
       }
 
-      router.push('/editor?example=' + encodeURIComponent(option.path));
+      router.push(
+        '/editor?example=' + encodeURIComponent(normalizeExamplePath(option.path))
+      );
     },
     [
       canUseCuratedAddons,
@@ -1296,18 +1298,6 @@ export default function Editor({ examplePath, onSettingsChange }: Props) {
       </Box>
     </PermanentDrawer>
   );
-}
-
-function getDesignPanelFromMode(mode: Mode): DesignPanel {
-  if (mode === 'image') {
-    return 'graphics';
-  }
-
-  if (mode === 'text') {
-    return 'text';
-  }
-
-  return 'materials';
 }
 
 const floatingControlButtonSx = {

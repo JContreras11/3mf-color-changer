@@ -20,6 +20,7 @@ import { useEditorFile } from './EditorFileContext';
 import { useExportReview } from './ExportReviewContext';
 import LoginDialog from './LoginDialog';
 import PermanentDrawer from './PermanentDrawer';
+import { normalizeExamplePath } from '../utils/examplePaths';
 
 type CapOption = {
   description: string;
@@ -156,7 +157,7 @@ export default function HomeRoute() {
   ]);
 
   const getEditorRoute = React.useCallback((path: string) => {
-    return '/editor?example=' + encodeURIComponent(path);
+    return '/editor?example=' + encodeURIComponent(normalizeExamplePath(path));
   }, []);
 
   const handleExampleSelect = React.useCallback(
