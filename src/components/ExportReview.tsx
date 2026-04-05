@@ -15,9 +15,12 @@ import Inventory2RoundedIcon from '@mui/icons-material/Inventory2Rounded';
 import RestartAltRoundedIcon from '@mui/icons-material/RestartAltRounded';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
+import Checkbox from '@mui/material/Checkbox';
 import Chip from '@mui/material/Chip';
 import CircularProgress from '@mui/material/CircularProgress';
 import Divider from '@mui/material/Divider';
+import Dialog from '@mui/material/Dialog';
+import FormControlLabel from '@mui/material/FormControlLabel';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import { alpha } from '@mui/material/styles';
@@ -25,23 +28,46 @@ import { useRouter } from 'next/navigation';
 import { enqueueSnackbar } from 'notistack';
 import React from 'react';
 
-const BRAND_TITLE = 'Customize your caps';
+const BRAND_TITLE = 'MakeYourCaps.com';
 
 export default function ExportReview() {
   const router = useRouter();
   const { clearUploadedFile } = useEditorFile();
   const { clearReviewData, reviewData } = useExportReview();
+  const [isDownloadModalOpen, setIsDownloadModalOpen] = React.useState(false);
+  const [hasAcceptedDisclaimer, setHasAcceptedDisclaimer] = React.useState(false);
 
-  const handleDownload = React.useCallback(() => {
+  React.useEffect(() => {
+    if (!reviewData) {
+      setIsDownloadModalOpen(false);
+      setHasAcceptedDisclaimer(false);
+    }
+  }, [reviewData]);
+
+  const handleOpenDownloadModal = React.useCallback(() => {
     if (!reviewData) {
       return;
     }
 
+    setHasAcceptedDisclaimer(false);
+    setIsDownloadModalOpen(true);
+  }, [reviewData]);
+
+  const handleCloseDownloadModal = React.useCallback(() => {
+    setIsDownloadModalOpen(false);
+  }, []);
+
+  const handleConfirmDownload = React.useCallback(() => {
+    if (!reviewData || !hasAcceptedDisclaimer) {
+      return;
+    }
+
     downloadExportBlob(reviewData.blob, reviewData.downloadName);
+    setIsDownloadModalOpen(false);
     enqueueSnackbar('Your 3MF is ready — download started.', {
       variant: 'success',
     });
-  }, [reviewData]);
+  }, [hasAcceptedDisclaimer, reviewData]);
 
   const handleRestart = React.useCallback(() => {
     clearReviewData();
@@ -52,7 +78,7 @@ export default function ExportReview() {
   const exportAction = (
     <Button
       disabled={!reviewData}
-      onClick={handleDownload}
+      onClick={handleOpenDownloadModal}
       startIcon={<DownloadRoundedIcon />}
       sx={headerActionSx}
     >
@@ -65,12 +91,19 @@ export default function ExportReview() {
       {reviewData ? (
         <ReviewLayout
           reviewData={reviewData}
-          onDownload={handleDownload}
+          onDownload={handleOpenDownloadModal}
           onRestart={handleRestart}
         />
       ) : (
         <EmptyReviewState onRestart={handleRestart} />
       )}
+      <DownloadDisclaimerModal
+        accepted={hasAcceptedDisclaimer}
+        open={isDownloadModalOpen}
+        onAcceptedChange={setHasAcceptedDisclaimer}
+        onClose={handleCloseDownloadModal}
+        onConfirm={handleConfirmDownload}
+      />
     </PermanentDrawer>
   );
 }
@@ -477,6 +510,229 @@ function EmptyReviewState({ onRestart }: { onRestart: () => void }) {
   );
 }
 
+function DownloadDisclaimerModal({
+  accepted,
+  open,
+  onAcceptedChange,
+  onClose,
+  onConfirm,
+}: {
+  accepted: boolean;
+  open: boolean;
+  onAcceptedChange: (value: boolean) => void;
+  onClose: () => void;
+  onConfirm: () => void;
+}) {
+  return (
+    <Dialog
+      open={open}
+      onClose={onClose}
+      fullWidth
+      maxWidth="lg"
+      slotProps={{
+        paper: {
+          sx: {
+            borderRadius: { xs: '28px', md: '34px' },
+            overflow: 'hidden',
+            bgcolor: alpha('#fdfefe', 0.98),
+            boxShadow: '0 30px 90px rgba(15, 23, 42, 0.18)',
+            border: `1px solid ${alpha('#d9e4fb', 0.92)}`,
+          },
+        },
+      }}
+    >
+      <Stack direction={{ xs: 'column', md: 'row' }} sx={{ minHeight: { md: 560 } }}>
+        <Box
+          sx={{
+            position: 'relative',
+            width: { xs: '100%', md: '50%' },
+            minHeight: { xs: 280, sm: 340, md: 'auto' },
+            p: { xs: 2.5, md: 2.75 },
+            background:
+              'radial-gradient(circle at top left, rgba(15,111,227,0.18) 0%, rgba(255,255,255,0.94) 46%, rgba(237,244,255,0.94) 100%)',
+            borderRight: {
+              md: `1px solid ${alpha('#d9e4fb', 0.92)}`,
+            },
+            borderBottom: {
+              xs: `1px solid ${alpha('#d9e4fb', 0.92)}`,
+              md: 'none',
+            },
+          }}
+        >
+          <Box
+            sx={{
+              display: 'inline-flex',
+              px: 1.5,
+              py: 0.8,
+              borderRadius: '999px',
+              bgcolor: alpha('#ffffff', 0.84),
+              color: '#0058bc',
+              fontSize: 12,
+              fontWeight: 800,
+              letterSpacing: '0.2em',
+              textTransform: 'uppercase',
+              boxShadow: '0 12px 28px rgba(0, 88, 188, 0.12)',
+            }}
+          >
+            Setup help
+          </Box>
+
+          <Box
+              sx={{
+                mt: 1.6,
+                borderRadius: '24px',
+                overflow: 'hidden',
+                border: `1px solid ${alpha('#d8e2ff', 0.92)}`,
+                boxShadow: '0 22px 50px rgba(15, 23, 42, 0.1)',
+              bgcolor: '#ffffff',
+            }}
+          >
+            <Box
+              component="img"
+              src="/help.gif"
+              alt="Bambu Studio setup recommendations preview"
+              sx={{
+                display: 'block',
+                width: '100%',
+                height: '100%',
+                minHeight: { xs: 220, md: 540 },
+                objectFit: 'cover',
+              }}
+            />
+          </Box>
+        </Box>
+
+        <Box
+          sx={{
+            width: { xs: '100%', md: '50%' },
+            p: { xs: 2.5, md: 3 },
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'space-between',
+            gap: 2,
+          }}
+        >
+          <Box>
+            <Typography
+              sx={{
+                color: '#a43c12',
+                fontSize: 13,
+                fontWeight: 800,
+                letterSpacing: '0.26em',
+                textTransform: 'uppercase',
+              }}
+            >
+              Important Notice
+            </Typography>
+            <Typography
+              sx={{
+                mt: 0.9,
+                fontFamily: '"Manrope", "Inter", sans-serif',
+                fontSize: { xs: 28, md: 34 },
+                lineHeight: 1,
+                letterSpacing: '-0.05em',
+                fontWeight: 800,
+                color: '#111827',
+              }}
+            >
+              Please confirm before downloading
+            </Typography>
+
+            <Stack spacing={1.5} sx={{ mt: 2, color: '#4b5563' }}>
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    size="small"
+                    checked={accepted}
+                    onChange={(event) => onAcceptedChange(event.target.checked)}
+                    sx={{
+                      alignSelf: 'flex-start',
+                      mt: 0.15,
+                      color: alpha('#0058bc', 0.54),
+                      '&.Mui-checked': {
+                        color: '#0058bc',
+                      },
+                    }}
+                  />
+                }
+                sx={{
+                  alignItems: 'flex-start',
+                  m: 0,
+                  '& .MuiFormControlLabel-label': {
+                    fontSize: 14,
+                    lineHeight: 1.6,
+                    color: '#334155',
+                  },
+                }}
+                label="By using MakeYourCaps, you acknowledge that the generated digital files (such as 3MF) are intended for personal use only and must not be shared, redistributed, or sold in any form."
+              />
+
+              <Typography sx={{ fontSize: 14, lineHeight: 1.6 }}>
+                We are currently working on improving compatibility of saved 3MF
+                configurations with Bambu Studio, including pre-configured
+                supports and pre-painted add-ons.
+              </Typography>
+
+              <Box>
+                <Typography
+                  sx={{
+                    fontSize: 14,
+                    fontWeight: 700,
+                    color: '#111827',
+                    mb: 0.8,
+                  }}
+                >
+                  In the meantime, we recommend:
+                </Typography>
+                <Stack
+                  component="ul"
+                  spacing={1}
+                  sx={{
+                    m: 0,
+                    pl: 2.6,
+                    fontSize: 14,
+                    lineHeight: 1.6,
+                    color: '#334155',
+                  }}
+                >
+                  <Box component="li">
+                    Reducing the color matcher to 4–16 colors (depending on your
+                    printer or preference)
+                  </Box>
+                  <Box component="li">Enabling tree supports starting at 40°</Box>
+                </Stack>
+              </Box>
+
+              <Typography sx={{ fontSize: 14, lineHeight: 1.6 }}>
+                We’re continuously improving the experience to make it smoother
+                and more reliable.
+              </Typography>
+            </Stack>
+          </Box>
+
+          <Stack
+            direction={{ xs: 'column-reverse', sm: 'row' }}
+            spacing={1.4}
+            justifyContent="flex-end"
+          >
+            <Button onClick={onClose} sx={modalSecondaryButtonSx}>
+              Cancel
+            </Button>
+            <Button
+              disabled={!accepted}
+              onClick={onConfirm}
+              startIcon={<DownloadRoundedIcon />}
+              sx={modalPrimaryButtonSx}
+            >
+              Download .3MF
+            </Button>
+          </Stack>
+        </Box>
+      </Stack>
+    </Dialog>
+  );
+}
+
 function SummaryItem({
   icon,
   label,
@@ -618,6 +874,22 @@ const panelSecondaryButtonSx = {
     background: alpha('#ffffff', 0.98),
     borderColor: alpha('#8ea7d9', 0.95),
   },
+};
+
+const modalPrimaryButtonSx = {
+  ...panelPrimaryButtonSx,
+  minHeight: 58,
+  px: 3,
+  '&.Mui-disabled': {
+    color: alpha('#ffffff', 0.78),
+    background: alpha('#8fb3e6', 0.92),
+  },
+};
+
+const modalSecondaryButtonSx = {
+  ...panelSecondaryButtonSx,
+  minHeight: 58,
+  px: 3,
 };
 
 function formatBytes(size: number) {

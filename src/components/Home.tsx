@@ -34,7 +34,7 @@ type CapOption = {
   title: string;
 };
 
-const BRAND_TITLE = 'Customize your caps';
+const BRAND_TITLE = 'MakeYourCaps.com';
 const DESIGN_COLORS = {
   accent: '#a43c12',
   background: '#f8f9fa',

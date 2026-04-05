@@ -14,7 +14,7 @@ import * as React from 'react';
 import NextLink from './NextLink';
 
 const drawerWidth = 340;
-const brandTitle = 'Customize your caps';
+const brandTitle = 'MakeYourCaps.com';
 const steps: ReadonlyArray<{ label: string; paths: readonly string[] }> = [
   { label: 'Base', paths: ['/'] },
   { label: 'Design', paths: ['/editor'] },
@@ -72,28 +72,51 @@ export default function PermanentDrawer({
           <Box
             sx={{
               display: 'flex',
-              width: { xs: '100%', sm: 220, md: 240 },
+              width: { xs: '100%', sm: 320, md: 380 },
               justifyContent: { xs: 'center', sm: 'flex-start' },
               flexShrink: 0,
+              minWidth: 0,
             }}
           >
-            <Typography
-              noWrap
+            <Box
               component={NextLink}
               sx={{
                 textDecoration: 'none',
                 boxShadow: 'none',
-                color: '#0058bc',
-                fontFamily: '"Manrope", "Inter", sans-serif',
-                fontSize: { xs: 22, sm: 24, md: 30 },
-                fontWeight: 800,
-                letterSpacing: '-0.04em',
-                flexShrink: 0,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: { xs: 1, md: 1.2 },
+                minWidth: 0,
               }}
               href="/"
             >
-              {title || brandTitle}
-            </Typography>
+              <Box
+                component="img"
+                src="/logo.png"
+                alt="MakeYourCaps.com logo"
+                sx={{
+                  width: { xs: 36, sm: 40, md: 46 },
+                  height: { xs: 26, sm: 29, md: 34 },
+                  objectFit: 'contain',
+                  flexShrink: 0,
+                }}
+              />
+              <Typography
+                noWrap
+                sx={{
+                  textDecoration: 'none',
+                  color: '#123b8a',
+                  fontFamily: '"Manrope", "Inter", sans-serif',
+                  fontSize: { xs: 24, sm: 24, md: 28 },
+                  fontWeight: 800,
+                  letterSpacing: '-0.045em',
+                  lineHeight: 1,
+                  minWidth: 0,
+                }}
+              >
+                {title || brandTitle}
+              </Typography>
+            </Box>
           </Box>
 
           <Stack

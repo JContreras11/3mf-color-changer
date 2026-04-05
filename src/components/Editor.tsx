@@ -53,7 +53,7 @@ import PermanentDrawer from './PermanentDrawer';
 import ThreeJsCanvas, { ThreeJsCanvasHandle } from './threeJs/Canvas';
 import useFile from './threeJs/useFile';
 
-const BRAND_TITLE = 'Customize your caps';
+const BRAND_TITLE = 'MakeYourCaps.com';
 const DEFAULT_IMAGE_ROTATION = 0;
 const DEFAULT_IMAGE_SIZE = 30;
 const DEFAULT_TEXT = 'Text';
