@@ -83,7 +83,7 @@ export default function HomeRoute() {
           'Classic front panel ready for logos, text and bold multi-color graphics.',
         eta: '12–18 Hours',
         imagePath: '/caps/trucker.webp',
-        path: 'examples/trucker_cap.3mf',
+        path: 'examples/trucker/Trucker Cap Base A1.3mf',
       },
       {
         id: 'future-cap',

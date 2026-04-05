@@ -1,4 +1,4 @@
-const MAX_IMAGE_CANVAS_SIZE = 1400;
+const MAX_IMAGE_CANVAS_SIZE = 2048;
 
 export default function createImageCanvas(
   file: File
@@ -34,7 +34,7 @@ export default function createImageCanvas(
       }
 
       context.imageSmoothingEnabled = true;
-      context.imageSmoothingQuality = 'high';
+      context.imageSmoothingQuality = 'medium';
       context.clearRect(0, 0, canvas.width, canvas.height);
       context.drawImage(image, 0, 0, canvas.width, canvas.height);
       cleanup();

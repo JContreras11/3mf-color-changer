@@ -5,6 +5,7 @@ import ColorizeRoundedIcon from '@mui/icons-material/ColorizeRounded';
 import FormatColorFillRoundedIcon from '@mui/icons-material/FormatColorFillRounded';
 import GestureRoundedIcon from '@mui/icons-material/GestureRounded';
 import RestartAltRoundedIcon from '@mui/icons-material/RestartAltRounded';
+import SwapHorizRoundedIcon from '@mui/icons-material/SwapHorizRounded';
 import Button from '@mui/material/Button';
 import ButtonBase from '@mui/material/ButtonBase';
 import Divider from '@mui/material/Divider';
@@ -34,6 +35,7 @@ type Props = {
   color: string;
   disabled?: boolean;
   imageName?: string;
+  imageMirrored: boolean;
   imageRotation: number;
   imageSize: number;
   mode: Mode;
@@ -42,6 +44,7 @@ type Props = {
   onApplyTruckerPreset: (sections: TruckerColorSections) => void;
   onApplyText: () => void;
   onColorChange: (color: string) => void;
+  onImageMirrorChange: (value: boolean) => void;
   onImageRotationChange: (value: number) => void;
   onImageSelect: (file: File) => void;
   onImageSizeChange: (value: number) => void;
@@ -50,11 +53,13 @@ type Props = {
   onResetMaterials: () => void;
   onResetText: () => void;
   onTextChange: (value: string) => void;
+  onTextMirrorChange: (value: boolean) => void;
   onTextRotationChange: (value: number) => void;
   onTextSizeChange: (value: number) => void;
   selectedAddonId?: string | null;
   showTruckerPresets?: boolean;
   text: string;
+  textMirrored: boolean;
   textRotation: number;
   textSize: number;
   truckerPresets: readonly TruckerColorPreset[];
@@ -104,6 +109,7 @@ const OverlayBrushPanel = React.memo(function OverlayBrushPanel({
   color,
   disabled = false,
   imageName,
+  imageMirrored,
   imageRotation,
   imageSize,
   mode,
@@ -112,6 +118,7 @@ const OverlayBrushPanel = React.memo(function OverlayBrushPanel({
   onApplyTruckerPreset,
   onApplyText,
   onColorChange,
+  onImageMirrorChange,
   onImageRotationChange,
   onImageSelect,
   onImageSizeChange,
@@ -120,11 +127,13 @@ const OverlayBrushPanel = React.memo(function OverlayBrushPanel({
   onResetMaterials,
   onResetText,
   onTextChange,
+  onTextMirrorChange,
   onTextRotationChange,
   onTextSizeChange,
   selectedAddonId,
   showTruckerPresets = false,
   text,
+  textMirrored,
   textRotation,
   textSize,
   truckerPresets,
@@ -539,6 +548,16 @@ const OverlayBrushPanel = React.memo(function OverlayBrushPanel({
               disabled={disabled}
               onChange={onImageRotationChange}
             />
+
+            <ToggleField
+              label="Mirror"
+              valueLabel={imageMirrored ? 'On' : 'Off'}
+              active={imageMirrored}
+              disabled={disabled}
+              onToggle={() => onImageMirrorChange(!imageMirrored)}
+              description="Flip the graphic horizontally before placing it."
+              icon={<SwapHorizRoundedIcon sx={{ fontSize: 20 }} />}
+            />
           </Stack>
         )}
 
@@ -691,6 +710,16 @@ const OverlayBrushPanel = React.memo(function OverlayBrushPanel({
               value={textRotation}
               disabled={disabled}
               onChange={onTextRotationChange}
+            />
+
+            <ToggleField
+              label="Mirror"
+              valueLabel={textMirrored ? 'On' : 'Off'}
+              active={textMirrored}
+              disabled={disabled}
+              onToggle={() => onTextMirrorChange(!textMirrored)}
+              description="Flip the text horizontally before placing it."
+              icon={<SwapHorizRoundedIcon sx={{ fontSize: 20 }} />}
             />
 
             <Box
@@ -1134,6 +1163,113 @@ function PanelActions({
         </Button>
       </Stack>
     </>
+  );
+}
+
+function ToggleField({
+  active,
+  description,
+  disabled = false,
+  icon,
+  label,
+  onToggle,
+  valueLabel,
+}: {
+  active: boolean;
+  description: string;
+  disabled?: boolean;
+  icon: React.ReactNode;
+  label: string;
+  onToggle: () => void;
+  valueLabel: string;
+}) {
+  return (
+    <Stack spacing={1.5}>
+      <Stack direction="row" justifyContent="space-between" alignItems="center">
+        <Typography
+          sx={{
+            fontSize: 12,
+            fontWeight: 800,
+            letterSpacing: '0.24em',
+            textTransform: 'uppercase',
+            color: '#374151',
+          }}
+        >
+          {label}
+        </Typography>
+        <Box
+          sx={{
+            px: 1.5,
+            py: 0.75,
+            borderRadius: '999px',
+            bgcolor: active ? alpha('#edf4ff', 0.92) : alpha('#f3f4f5', 0.96),
+            color: active ? '#0058bc' : '#6b7280',
+            fontWeight: 800,
+            fontSize: 13,
+          }}
+        >
+          {valueLabel}
+        </Box>
+      </Stack>
+      <ButtonBase
+        disabled={disabled}
+        onClick={onToggle}
+        sx={{
+          width: '100%',
+          p: 1.8,
+          borderRadius: '22px',
+          textAlign: 'left',
+          justifyContent: 'flex-start',
+          bgcolor: active ? alpha('#edf4ff', 0.95) : alpha('#f8f9fa', 0.92),
+          border: active
+            ? '1px solid rgba(0, 88, 188, 0.28)'
+            : '1px solid rgba(193, 198, 215, 0.38)',
+          boxShadow: active ? '0 12px 24px rgba(0, 88, 188, 0.08)' : 'none',
+          transition:
+            'transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease',
+          '&:hover': {
+            transform: disabled ? 'none' : 'translateY(-1px)',
+            borderColor: active
+              ? 'rgba(0, 88, 188, 0.34)'
+              : 'rgba(0, 88, 188, 0.22)',
+          },
+        }}
+      >
+        <Stack direction="row" spacing={1.5} alignItems="center">
+          <Box
+            sx={{
+              width: 40,
+              height: 40,
+              borderRadius: '14px',
+              display: 'grid',
+              placeItems: 'center',
+              background: active
+                ? 'linear-gradient(145deg, #0058bc 0%, #0f6fe3 100%)'
+                : alpha('#eef1f6', 0.92),
+              color: active ? '#ffffff' : '#414755',
+              flexShrink: 0,
+            }}
+          >
+            {icon}
+          </Box>
+          <Box>
+            <Typography
+              sx={{
+                fontFamily: '"Manrope", "Inter", sans-serif',
+                fontWeight: 700,
+                color: '#111827',
+                mb: 0.45,
+              }}
+            >
+              Mirror horizontally
+            </Typography>
+            <Typography sx={{ color: '#6b7280', fontSize: 13, lineHeight: 1.6 }}>
+              {description}
+            </Typography>
+          </Box>
+        </Stack>
+      </ButtonBase>
+    </Stack>
   );
 }
 

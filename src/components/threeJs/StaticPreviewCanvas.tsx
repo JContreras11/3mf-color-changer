@@ -10,35 +10,12 @@ import Model from './Model';
 
 const previewCameraPosition = new THREE.Vector3(7, 6, 7);
 
-function PreviewScene({ geometry }: { geometry: THREE.Object3D }) {
-  const cameraControlRef = React.useRef<CameraControls | null>(null);
-
-  const handleModelReady = React.useCallback(() => {
-    cameraControlRef.current?.setLookAt(
-      previewCameraPosition.x,
-      previewCameraPosition.y,
-      previewCameraPosition.z,
-      0,
-      0,
-      0,
-      false
-    );
-    cameraControlRef.current?.fitToSphere(geometry, false);
-  }, [geometry]);
-
-  return (
-    <>
-      <CameraControls ref={cameraControlRef} enabled={false} />
-      <Environment direction={[7, 8, 6]} showGrid={false} />
-      <Model geometry={geometry} onReady={handleModelReady} />
-    </>
-  );
-}
-
 export default function StaticPreviewCanvas({
   geometry,
+  onReady,
 }: {
   geometry: THREE.Object3D;
+  onReady?: () => void;
 }) {
   return (
     <Canvas
@@ -53,7 +30,56 @@ export default function StaticPreviewCanvas({
         position: previewCameraPosition.toArray(),
       }}
     >
-      <PreviewScene geometry={geometry} />
+      <PreviewSceneWithReady geometry={geometry} onReady={onReady} />
     </Canvas>
+  );
+}
+
+function PreviewSceneWithReady({
+  geometry,
+  onReady,
+}: {
+  geometry: THREE.Object3D;
+  onReady?: () => void;
+}) {
+  const frameRef = React.useRef<number | null>(null);
+  const cameraControlRef = React.useRef<CameraControls | null>(null);
+
+  const handleModelReady = React.useCallback(() => {
+    cameraControlRef.current?.setLookAt(
+      previewCameraPosition.x,
+      previewCameraPosition.y,
+      previewCameraPosition.z,
+      0,
+      0,
+      0,
+      false
+    );
+    cameraControlRef.current?.fitToSphere(geometry, false);
+
+    if (frameRef.current !== null) {
+      window.cancelAnimationFrame(frameRef.current);
+    }
+
+    frameRef.current = window.requestAnimationFrame(() => {
+      onReady?.();
+    });
+  }, [geometry, onReady]);
+
+  React.useEffect(
+    () => () => {
+      if (frameRef.current !== null) {
+        window.cancelAnimationFrame(frameRef.current);
+      }
+    },
+    []
+  );
+
+  return (
+    <>
+      <CameraControls ref={cameraControlRef} enabled={false} />
+      <Environment direction={[7, 8, 6]} showGrid={false} />
+      <Model geometry={geometry} onReady={handleModelReady} />
+    </>
   );
 }

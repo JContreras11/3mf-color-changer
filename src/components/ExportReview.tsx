@@ -16,6 +16,7 @@ import RestartAltRoundedIcon from '@mui/icons-material/RestartAltRounded';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Chip from '@mui/material/Chip';
+import CircularProgress from '@mui/material/CircularProgress';
 import Divider from '@mui/material/Divider';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
@@ -83,6 +84,12 @@ function ReviewLayout({
   onDownload: () => void;
   onRestart: () => void;
 }) {
+  const [isPreviewReady, setIsPreviewReady] = React.useState(false);
+
+  React.useEffect(() => {
+    setIsPreviewReady(false);
+  }, [reviewData.previewObject.uuid]);
+
   const metricItems = [
     {
       icon: <Inventory2RoundedIcon sx={{ fontSize: 24 }} />,
@@ -140,6 +147,7 @@ function ReviewLayout({
           background:
             'radial-gradient(circle at top, rgba(255,255,255,0.98) 0%, rgba(244,246,249,0.96) 46%, rgba(233,238,244,0.92) 100%)',
         }}
+        aria-busy={!isPreviewReady}
       >
         <Box
           sx={{
@@ -171,8 +179,67 @@ function ReviewLayout({
             },
           }}
         >
-          <StaticPreviewCanvas geometry={reviewData.previewObject} />
+          <StaticPreviewCanvas
+            geometry={reviewData.previewObject}
+            onReady={() => setIsPreviewReady(true)}
+          />
         </Box>
+
+        {!isPreviewReady && (
+          <Box
+            sx={{
+              position: 'absolute',
+              inset: 0,
+              zIndex: 3,
+              display: 'grid',
+              placeItems: 'center',
+              px: 3,
+              background:
+                'linear-gradient(180deg, rgba(255,255,255,0.70) 0%, rgba(248,250,253,0.86) 100%)',
+              backdropFilter: 'blur(8px)',
+            }}
+          >
+            <Stack
+              spacing={2}
+              alignItems="center"
+              sx={{
+                width: 'min(100%, 360px)',
+                p: { xs: 2.5, md: 3 },
+                borderRadius: '28px',
+                bgcolor: alpha('#ffffff', 0.9),
+                border: `1px solid ${alpha('#d8e2ff', 0.9)}`,
+                boxShadow: '0 24px 60px rgba(15, 23, 42, 0.08)',
+                textAlign: 'center',
+              }}
+            >
+              <CircularProgress size={34} thickness={4.6} />
+              <Box>
+                <Typography
+                  sx={{
+                    fontFamily: '"Manrope", "Inter", sans-serif',
+                    fontWeight: 800,
+                    fontSize: { xs: 16, md: 18 },
+                    color: '#111827',
+                    letterSpacing: '-0.03em',
+                  }}
+                >
+                  Loading generated 3MF
+                </Typography>
+                <Typography
+                  sx={{
+                    mt: 0.8,
+                    color: '#4b5563',
+                    fontSize: 14,
+                    lineHeight: 1.65,
+                  }}
+                >
+                  Preparing the left preview panel so you can inspect the final
+                  isometric result.
+                </Typography>
+              </Box>
+            </Stack>
+          </Box>
+        )}
 
         <Stack
           direction={{ xs: 'column', sm: 'row' }}

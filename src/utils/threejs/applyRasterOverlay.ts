@@ -19,9 +19,10 @@ type Props = {
 };
 
 const ALPHA_THRESHOLD = 24;
-const MAX_SEGMENTS = 64;
+const MAX_SEGMENTS = 96;
 const MIN_SEGMENTS = 8;
 const SEGMENTS_PER_MM = 1;
+const TEXTURE_PIXELS_PER_SEGMENT = 24;
 const SURFACE_OFFSET = 0.05;
 const YIELD_EVERY_ROWS = 4;
 const FACE_NORMAL_WORLD = new THREE.Vector3();
@@ -164,7 +165,13 @@ async function createOverlayGeometry(
   height: number,
   aspect: number
 ) {
-  const { cols, rows } = getSegmentCounts(width, height, aspect);
+  const { cols, rows } = getSegmentCounts(
+    width,
+    height,
+    aspect,
+    canvas.width,
+    canvas.height
+  );
 
   const imageData = getRasterData(canvas, cols, rows);
   const opaqueCells = getOpaqueCells(imageData, cols, rows);
@@ -358,32 +365,53 @@ function localDirectionToWorld(
   return targetWorld.sub(originWorld).normalize();
 }
 
-function getSegmentCounts(width: number, height: number, aspect: number) {
+function getSegmentCounts(
+  width: number,
+  height: number,
+  aspect: number,
+  canvasWidth: number,
+  canvasHeight: number
+) {
   const dominantLength = Math.max(width, height);
-  const dominantSegments = THREE.MathUtils.clamp(
+  const sizeDrivenDominantSegments = THREE.MathUtils.clamp(
     Math.round(dominantLength * SEGMENTS_PER_MM),
     MIN_SEGMENTS,
     MAX_SEGMENTS
   );
-
-  if (aspect >= 1) {
-    return {
-      cols: dominantSegments,
-      rows: THREE.MathUtils.clamp(
-        Math.round(dominantSegments / Math.max(aspect, 1)),
-        MIN_SEGMENTS,
-        MAX_SEGMENTS
-      ),
-    };
-  }
-
-  return {
+  const sizeDrivenSegments =
+    aspect >= 1
+      ? {
+          cols: sizeDrivenDominantSegments,
+          rows: THREE.MathUtils.clamp(
+            Math.round(sizeDrivenDominantSegments / Math.max(aspect, 1)),
+            MIN_SEGMENTS,
+            MAX_SEGMENTS
+          ),
+        }
+      : {
+          cols: THREE.MathUtils.clamp(
+            Math.round(sizeDrivenDominantSegments * Math.max(aspect, 1e-3)),
+            MIN_SEGMENTS,
+            MAX_SEGMENTS
+          ),
+          rows: sizeDrivenDominantSegments,
+        };
+  const textureDrivenSegments = {
     cols: THREE.MathUtils.clamp(
-      Math.round(dominantSegments * Math.max(aspect, 1e-3)),
+      Math.round(canvasWidth / TEXTURE_PIXELS_PER_SEGMENT),
       MIN_SEGMENTS,
       MAX_SEGMENTS
     ),
-    rows: dominantSegments,
+    rows: THREE.MathUtils.clamp(
+      Math.round(canvasHeight / TEXTURE_PIXELS_PER_SEGMENT),
+      MIN_SEGMENTS,
+      MAX_SEGMENTS
+    ),
+  };
+
+  return {
+    cols: Math.max(sizeDrivenSegments.cols, textureDrivenSegments.cols),
+    rows: Math.max(sizeDrivenSegments.rows, textureDrivenSegments.rows),
   };
 }
 

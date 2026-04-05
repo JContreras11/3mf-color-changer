@@ -41,6 +41,7 @@ import createImageCanvas from '../utils/threejs/createImageCanvas';
 import createTextCanvas from '../utils/threejs/createTextCanvas';
 import getFace from '../utils/threejs/getFace';
 import getFaceColor from '../utils/threejs/getFaceColor';
+import mirrorCanvasHorizontally from '../utils/threejs/mirrorCanvasHorizontally';
 import {
   getRasterOverlayDimensions,
   getRasterOverlayPlacement,
@@ -130,20 +131,18 @@ export default function Editor({ examplePath, onSettingsChange }: Props) {
     React.useState<DesignPanel>('objects');
   const [workingColor, setWorkingColor] =
     React.useState<string>(initialWorkingColor);
-  const [imageCanvas, setImageCanvas] =
+  const [sourceImageCanvas, setSourceImageCanvas] =
     React.useState<HTMLCanvasElement | null>(null);
-  const [imageFile, setImageFile] = React.useState<File | null>(null);
   const [imageName, setImageName] = React.useState<string>();
   const [imageSize, setImageSize] = React.useState(DEFAULT_IMAGE_SIZE);
   const [imageRotation, setImageRotation] = React.useState(
     DEFAULT_IMAGE_ROTATION
   );
-  const [imagePreviewUrl, setImagePreviewUrl] = React.useState<string | null>(
-    null
-  );
+  const [imageMirrored, setImageMirrored] = React.useState(false);
   const [textValue, setTextValue] = React.useState(DEFAULT_TEXT);
   const [textSize, setTextSize] = React.useState(DEFAULT_TEXT_SIZE);
   const [textRotation, setTextRotation] = React.useState(DEFAULT_TEXT_ROTATION);
+  const [textMirrored, setTextMirrored] = React.useState(false);
   const [ghostOverlay, setGhostOverlay] = React.useState<GhostOverlay | null>(
     null
   );
@@ -210,13 +209,31 @@ export default function Editor({ examplePath, onSettingsChange }: Props) {
     : capFamily === 'custom'
       ? 'Curated accessory variations are currently available for the prepared Trucker Cap base. Select that silhouette from Base to explore add-ons.'
       : `Accessory-ready 3MF variations are currently prepared for the Trucker Cap base. ${capFamilyLabel} add-ons will arrive in a future version.`;
-  const textCanvas = React.useMemo(() => {
+  const imageCanvas = React.useMemo(() => {
+    if (!sourceImageCanvas) {
+      return null;
+    }
+
+    return mirrorCanvasHorizontally(sourceImageCanvas, imageMirrored);
+  }, [imageMirrored, sourceImageCanvas]);
+  const imagePreviewUrl = React.useMemo(
+    () => imageCanvas?.toDataURL() || null,
+    [imageCanvas]
+  );
+  const baseTextCanvas = React.useMemo(() => {
     try {
       return createTextCanvas(textValue, workingColor);
     } catch {
       return null;
     }
   }, [textValue, workingColor]);
+  const textCanvas = React.useMemo(() => {
+    if (!baseTextCanvas) {
+      return null;
+    }
+
+    return mirrorCanvasHorizontally(baseTextCanvas, textMirrored);
+  }, [baseTextCanvas, textMirrored]);
   const textPreviewUrl = React.useMemo(
     () => textCanvas?.toDataURL() || null,
     [textCanvas]
@@ -240,20 +257,6 @@ export default function Editor({ examplePath, onSettingsChange }: Props) {
   useEffect(() => {
     setGhostOverlay(null);
   }, [object]);
-
-  useEffect(() => {
-    if (!imageFile) {
-      setImagePreviewUrl(null);
-      return;
-    }
-
-    const previewUrl = URL.createObjectURL(imageFile);
-    setImagePreviewUrl(previewUrl);
-
-    return () => {
-      URL.revokeObjectURL(previewUrl);
-    };
-  }, [imageFile]);
 
   useEffect(() => {
     if (activePanel === 'objects') {
@@ -662,8 +665,7 @@ export default function Editor({ examplePath, onSettingsChange }: Props) {
     async (uploadedFile: File) => {
       try {
         const canvas = await createImageCanvas(uploadedFile);
-        setImageCanvas(canvas);
-        setImageFile(uploadedFile);
+        setSourceImageCanvas(canvas);
         setImageName(uploadedFile.name);
       } catch (error) {
         enqueueSnackbar(error.toString(), { variant: 'error' });
@@ -779,11 +781,11 @@ export default function Editor({ examplePath, onSettingsChange }: Props) {
   );
 
   const handleResetGraphics = React.useCallback(() => {
-    setImageCanvas(null);
-    setImageFile(null);
+    setSourceImageCanvas(null);
     setImageName(undefined);
     setImageSize(DEFAULT_IMAGE_SIZE);
     setImageRotation(DEFAULT_IMAGE_ROTATION);
+    setImageMirrored(false);
     setGhostOverlay(null);
   }, []);
 
@@ -802,6 +804,7 @@ export default function Editor({ examplePath, onSettingsChange }: Props) {
     setTextValue(DEFAULT_TEXT);
     setTextSize(DEFAULT_TEXT_SIZE);
     setTextRotation(DEFAULT_TEXT_ROTATION);
+    setTextMirrored(false);
     setGhostOverlay(null);
   }, []);
 
@@ -1269,6 +1272,7 @@ export default function Editor({ examplePath, onSettingsChange }: Props) {
             color={workingColor}
             disabled={isEditorBusy}
             imageName={imageName}
+            imageMirrored={imageMirrored}
             imageRotation={imageRotation}
             imageSize={imageSize}
             mode={mode}
@@ -1277,6 +1281,7 @@ export default function Editor({ examplePath, onSettingsChange }: Props) {
             onApplyTruckerPreset={handleApplyTruckerPreset}
             onApplyText={handleApplyText}
             onColorChange={handleWorkingColorChange}
+            onImageMirrorChange={setImageMirrored}
             onImageRotationChange={setImageRotation}
             onImageSelect={handleImageFileChange}
             onImageSizeChange={setImageSize}
@@ -1285,11 +1290,13 @@ export default function Editor({ examplePath, onSettingsChange }: Props) {
             onResetMaterials={handleResetMaterials}
             onResetText={handleResetText}
             onTextChange={setTextValue}
+            onTextMirrorChange={setTextMirrored}
             onTextRotationChange={setTextRotation}
             onTextSizeChange={setTextSize}
             selectedAddonId={canUseCuratedAddons ? selectedAddonId : null}
             showTruckerPresets={capFamily === 'trucker'}
             text={textValue}
+            textMirrored={textMirrored}
             textRotation={textRotation}
             textSize={textSize}
             truckerPresets={TRUCKER_COLOR_PRESETS}
