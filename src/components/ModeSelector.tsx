@@ -12,8 +12,6 @@ import React from 'react';
 
 export type Mode =
   | 'mesh'
-  | 'triangle'
-  | 'select_color'
   | 'text'
   | 'image';
 
@@ -53,7 +51,7 @@ const panelItems = [
     id: 'materials',
     label: 'Materials',
     icon: PaletteOutlinedIcon,
-    tooltip: 'Paint the cap, edit color details, or sample a color from the model.',
+    tooltip: 'Paint the whole cap and refine its active color.',
   },
 ] as const satisfies readonly {
   icon: typeof PaletteOutlinedIcon;

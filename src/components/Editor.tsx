@@ -34,13 +34,11 @@ import {
   type TruckerColorSections,
 } from '../utils/truckerCapPresets';
 import applyRasterOverlay from '../utils/threejs/applyRasterOverlay';
-import changeFaceColor from '../utils/threejs/changeFaceColor';
 import changeMeshColor from '../utils/threejs/changeMeshColor';
 import cloneObjectForHistory from '../utils/threejs/cloneObjectForHistory';
 import createImageCanvas from '../utils/threejs/createImageCanvas';
 import createTextCanvas from '../utils/threejs/createTextCanvas';
 import getFace from '../utils/threejs/getFace';
-import getFaceColor from '../utils/threejs/getFaceColor';
 import mirrorCanvasHorizontally from '../utils/threejs/mirrorCanvasHorizontally';
 import {
   getRasterOverlayDimensions,
@@ -344,31 +342,11 @@ export default function Editor({ examplePath, onSettingsChange }: Props) {
       }
 
       if (panel === 'materials') {
-        return currentMode === 'mesh' ||
-          currentMode === 'triangle' ||
-          currentMode === 'select_color'
-          ? currentMode
-          : 'mesh';
+        return 'mesh';
       }
 
       return currentMode;
     });
-  }, []);
-
-  const handleModeChange = React.useCallback((newMode: Mode) => {
-    setMode(newMode);
-
-    if (newMode === 'image') {
-      setActivePanel('graphics');
-      return;
-    }
-
-    if (newMode === 'text') {
-      setActivePanel('text');
-      return;
-    }
-
-    setActivePanel('materials');
   }, []);
 
   const handleSelect = (e: ThreeEvent<MouseEvent>) => {
@@ -385,21 +363,6 @@ export default function Editor({ examplePath, onSettingsChange }: Props) {
           batchDuringStroke: e.type === 'pointermove',
         }
       );
-    } else if (mode === 'triangle') {
-      if (!e.face) {
-        return;
-      }
-
-      performSyncSceneMutation(
-        () => {
-          handleFaceColorChange(e, workingColor);
-        },
-        {
-          batchDuringStroke: e.type === 'pointermove',
-        }
-      );
-    } else if (mode === 'select_color' && e.face) {
-      setWorkingColor(getFaceColor(e.object as THREE.Mesh, e.face));
     } else if (mode === 'image') {
       void handleImageOverlay(e);
     } else if (mode === 'text') {
@@ -453,14 +416,6 @@ export default function Editor({ examplePath, onSettingsChange }: Props) {
 
       changeMeshColor(child as THREE.Mesh, color);
     });
-  };
-
-  const handleFaceColorChange = (e: ThreeEvent<MouseEvent>, color) => {
-    const mesh = e.object as THREE.Mesh;
-
-    if (e.face) {
-      changeFaceColor(mesh, color, e.face);
-    }
   };
 
   const handleWorkingColorChange = React.useCallback((color) => {
@@ -755,11 +710,6 @@ export default function Editor({ examplePath, onSettingsChange }: Props) {
     },
     [createHistorySnapshot, forceCanvasRender, pushUndoSnapshot]
   );
-
-  const handleResetMaterials = React.useCallback(() => {
-    setWorkingColor(initialWorkingColor);
-    handleModeChange('mesh');
-  }, [handleModeChange, initialWorkingColor]);
 
   const handleApplyTruckerPreset = React.useCallback(
     (sections: TruckerColorSections) => {
@@ -1106,10 +1056,7 @@ export default function Editor({ examplePath, onSettingsChange }: Props) {
               {object && (
                 <ThreeJsCanvas
                   ref={canvasControlsRef}
-                  continuousPaint={
-                    activePanel === 'materials' &&
-                    (mode === 'mesh' || mode === 'triangle')
-                  }
+                  continuousPaint={activePanel === 'materials'}
                   geometry={object}
                   onModelReady={handleModelReady}
                   onSelect={handleSelect}
@@ -1236,7 +1183,6 @@ export default function Editor({ examplePath, onSettingsChange }: Props) {
             imageMirrored={imageMirrored}
             imageRotation={imageRotation}
             imageSize={imageSize}
-            mode={mode}
             onAddonSelect={handleAddonSelect}
             onApplyTruckerPreset={handleApplyTruckerPreset}
             onColorChange={handleWorkingColorChange}
@@ -1244,8 +1190,6 @@ export default function Editor({ examplePath, onSettingsChange }: Props) {
             onImageRotationChange={setImageRotation}
             onImageSelect={handleImageFileChange}
             onImageSizeChange={setImageSize}
-            onModeChange={handleModeChange}
-            onResetMaterials={handleResetMaterials}
             onTextChange={setTextValue}
             onTextMirrorChange={setTextMirrored}
             onTextRotationChange={setTextRotation}
@@ -1521,10 +1465,6 @@ function persistEditorSettings(settings: Settings) {
 function normalizeEditorMode(
   mode: Settings['mode'] | string | undefined
 ): Mode | undefined {
-  if (mode === 'triangle_neighbors') {
-    return 'triangle';
-  }
-
   if (mode === 'add_text') {
     return 'text';
   }
@@ -1534,9 +1474,15 @@ function normalizeEditorMode(
   }
 
   if (
-    mode === 'mesh' ||
+    mode === 'triangle_neighbors' ||
     mode === 'triangle' ||
-    mode === 'select_color' ||
+    mode === 'select_color'
+  ) {
+    return 'mesh';
+  }
+
+  if (
+    mode === 'mesh' ||
     mode === 'text' ||
     mode === 'image'
   ) {

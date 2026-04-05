@@ -1,14 +1,10 @@
 import AutoAwesomeRoundedIcon from '@mui/icons-material/AutoAwesomeRounded';
 import CheckRoundedIcon from '@mui/icons-material/CheckRounded';
 import CloudUploadRoundedIcon from '@mui/icons-material/CloudUploadRounded';
-import ColorizeRoundedIcon from '@mui/icons-material/ColorizeRounded';
 import FormatColorFillRoundedIcon from '@mui/icons-material/FormatColorFillRounded';
 import GestureRoundedIcon from '@mui/icons-material/GestureRounded';
-import RestartAltRoundedIcon from '@mui/icons-material/RestartAltRounded';
 import SwapHorizRoundedIcon from '@mui/icons-material/SwapHorizRounded';
-import Button from '@mui/material/Button';
 import ButtonBase from '@mui/material/ButtonBase';
-import Divider from '@mui/material/Divider';
 import Image from 'next/image';
 import Paper from '@mui/material/Paper';
 import Slider from '@mui/material/Slider';
@@ -25,7 +21,7 @@ import type {
   TruckerColorPreset,
   TruckerColorSections,
 } from '../utils/truckerCapPresets';
-import { DesignPanel, Mode } from './ModeSelector';
+import { DesignPanel } from './ModeSelector';
 
 type Props = {
   activePanel: DesignPanel;
@@ -38,7 +34,6 @@ type Props = {
   imageMirrored: boolean;
   imageRotation: number;
   imageSize: number;
-  mode: Mode;
   onAddonSelect: (option: AddonOption) => void;
   onApplyTruckerPreset: (sections: TruckerColorSections) => void;
   onColorChange: (color: string) => void;
@@ -46,8 +41,6 @@ type Props = {
   onImageRotationChange: (value: number) => void;
   onImageSelect: (file: File) => void;
   onImageSizeChange: (value: number) => void;
-  onModeChange: (mode: Mode) => void;
-  onResetMaterials: () => void;
   onTextChange: (value: string) => void;
   onTextMirrorChange: (value: boolean) => void;
   onTextRotationChange: (value: number) => void;
@@ -80,7 +73,7 @@ const panelCopy: Record<
   materials: {
     eyebrow: 'Material Studio',
     title: 'Surface & Color',
-    subtitle: 'Choose how you paint the cap and refine its active color.',
+    subtitle: 'Whole Cap painting stays active while you refine the current color.',
   },
   graphics: {
     title: 'Image/Logo Settings',
@@ -108,7 +101,6 @@ const OverlayBrushPanel = React.memo(function OverlayBrushPanel({
   imageMirrored,
   imageRotation,
   imageSize,
-  mode,
   onAddonSelect,
   onApplyTruckerPreset,
   onColorChange,
@@ -116,8 +108,6 @@ const OverlayBrushPanel = React.memo(function OverlayBrushPanel({
   onImageRotationChange,
   onImageSelect,
   onImageSizeChange,
-  onModeChange,
-  onResetMaterials,
   onTextChange,
   onTextMirrorChange,
   onTextRotationChange,
@@ -260,8 +250,6 @@ const OverlayBrushPanel = React.memo(function OverlayBrushPanel({
 
         {activePanel === 'materials' && (
           <Stack spacing={3}>
-            <ModeOptionGroup mode={mode} onModeChange={onModeChange} />
-
             <Box
               sx={{
                 p: 2,
@@ -452,7 +440,7 @@ const OverlayBrushPanel = React.memo(function OverlayBrushPanel({
             <InfoCard
               icon={<FormatColorFillRoundedIcon sx={{ fontSize: 20 }} />}
               title="Direct painting"
-              description="Use Whole Cap for broad fills, Detail for precise zones, and Pick to sample an existing tone from the model."
+              description="Whole Cap painting is always active here, so every click paints the selected solid with the current atelier color."
             />
           </Stack>
         )}
@@ -753,121 +741,11 @@ const OverlayBrushPanel = React.memo(function OverlayBrushPanel({
         )}
       </Box>
 
-      {activePanel === 'materials' && (
-        <PanelActions
-          primaryLabel="Paint Whole Cap"
-          onPrimary={() => onModeChange('mesh')}
-          secondaryLabel="Reset Palette"
-          onSecondary={onResetMaterials}
-          disabled={disabled}
-        />
-      )}
     </Paper>
   );
 });
 
 export default OverlayBrushPanel;
-
-function ModeOptionGroup({
-  mode,
-  onModeChange,
-}: {
-  mode: Mode;
-  onModeChange: (mode: Mode) => void;
-}) {
-  const options: { description: string; icon: React.ReactNode; label: string; value: Mode }[] = [
-    {
-      value: 'mesh',
-      label: 'Whole Cap',
-      description: 'Paint entire solids in one click.',
-      icon: <FormatColorFillRoundedIcon sx={{ fontSize: 18 }} />,
-    },
-    {
-      value: 'triangle',
-      label: 'Detail',
-      description: 'Brush smaller surface regions.',
-      icon: <GestureRoundedIcon sx={{ fontSize: 18 }} />,
-    },
-    {
-      value: 'select_color',
-      label: 'Pick',
-      description: 'Sample a color directly from the model.',
-      icon: <ColorizeRoundedIcon sx={{ fontSize: 18 }} />,
-    },
-  ];
-
-  return (
-    <Stack spacing={1.25}>
-      <Typography
-        sx={{
-          fontSize: 12,
-          fontWeight: 800,
-          letterSpacing: '0.24em',
-          textTransform: 'uppercase',
-          color: '#6b7280',
-        }}
-      >
-        Painting Mode
-      </Typography>
-      {options.map((option) => {
-        const active = option.value === mode;
-
-        return (
-          <ButtonBase
-            key={option.value}
-            onClick={() => onModeChange(option.value)}
-            sx={{
-              width: '100%',
-              p: 2,
-              borderRadius: '22px',
-              textAlign: 'left',
-              justifyContent: 'flex-start',
-              bgcolor: active ? alpha('#edf4ff', 0.95) : alpha('#f8f9fa', 0.82),
-              border: active
-                ? '1px solid rgba(0, 88, 188, 0.30)'
-                : '1px solid rgba(193, 198, 215, 0.35)',
-              boxShadow: active
-                ? '0 12px 24px rgba(0, 88, 188, 0.08)'
-                : 'none',
-            }}
-          >
-            <Stack direction="row" spacing={1.5} alignItems="center">
-              <Box
-                sx={{
-                  width: 40,
-                  height: 40,
-                  borderRadius: '14px',
-                  display: 'grid',
-                  placeItems: 'center',
-                  background: active
-                    ? 'linear-gradient(145deg, #0058bc 0%, #0f6fe3 100%)'
-                    : alpha('#eef1f6', 0.92),
-                  color: active ? '#ffffff' : '#414755',
-                }}
-              >
-                {option.icon}
-              </Box>
-              <Box>
-                <Typography
-                  sx={{
-                    fontFamily: '"Manrope", "Inter", sans-serif',
-                    fontWeight: 700,
-                    color: '#111827',
-                  }}
-                >
-                  {option.label}
-                </Typography>
-                <Typography sx={{ color: '#6b7280', fontSize: 13 }}>
-                  {option.description}
-                </Typography>
-              </Box>
-            </Stack>
-          </ButtonBase>
-        );
-      })}
-    </Stack>
-  );
-}
 
 function TruckerPresetButton({
   disabled = false,
@@ -1074,67 +952,6 @@ function SliderField({
         }}
       />
     </Stack>
-  );
-}
-
-function PanelActions({
-  disabled = false,
-  onPrimary,
-  onSecondary,
-  primaryLabel,
-  secondaryLabel,
-}: {
-  disabled?: boolean;
-  onPrimary: () => void;
-  onSecondary: () => void;
-  primaryLabel: string;
-  secondaryLabel: string;
-}) {
-  return (
-    <>
-      <Divider sx={{ my: 2, borderColor: alpha('#c1c6d7', 0.45) }} />
-      <Stack direction="row" spacing={1.5}>
-        <Button
-          disabled={disabled}
-          onClick={onSecondary}
-          startIcon={<RestartAltRoundedIcon />}
-          sx={{
-            flex: 1,
-            borderRadius: '20px',
-            px: 2.5,
-            py: 1.6,
-            bgcolor: alpha('#f3f4f5', 0.96),
-            color: '#374151',
-            fontFamily: '"Manrope", "Inter", sans-serif',
-            fontWeight: 700,
-            textTransform: 'none',
-          }}
-        >
-          {secondaryLabel}
-        </Button>
-        <Button
-          disabled={disabled}
-          onClick={onPrimary}
-          sx={{
-            flex: 1.45,
-            borderRadius: '20px',
-            px: 2.5,
-            py: 1.6,
-            background: 'linear-gradient(145deg, #0058bc 0%, #0f6fe3 100%)',
-            color: '#ffffff',
-            fontFamily: '"Manrope", "Inter", sans-serif',
-            fontWeight: 800,
-            textTransform: 'none',
-            boxShadow: '0 18px 32px rgba(0, 88, 188, 0.22)',
-            '&:hover': {
-              background: 'linear-gradient(145deg, #004da6 0%, #0c67d6 100%)',
-            },
-          }}
-        >
-          {primaryLabel}
-        </Button>
-      </Stack>
-    </>
   );
 }
 
