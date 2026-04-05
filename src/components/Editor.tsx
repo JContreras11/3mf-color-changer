@@ -780,45 +780,6 @@ export default function Editor({ examplePath, onSettingsChange }: Props) {
     [object, performSyncSceneMutation]
   );
 
-  const handleResetGraphics = React.useCallback(() => {
-    setSourceImageCanvas(null);
-    setImageName(undefined);
-    setImageSize(DEFAULT_IMAGE_SIZE);
-    setImageRotation(DEFAULT_IMAGE_ROTATION);
-    setImageMirrored(false);
-    setGhostOverlay(null);
-  }, []);
-
-  const handleApplyGraphics = React.useCallback(() => {
-    if (!imageCanvas) {
-      enqueueSnackbar('Upload a graphic first.', { variant: 'info' });
-      return;
-    }
-
-    enqueueSnackbar('Click the cap surface to place your graphic.', {
-      variant: 'info',
-    });
-  }, [imageCanvas]);
-
-  const handleResetText = React.useCallback(() => {
-    setTextValue(DEFAULT_TEXT);
-    setTextSize(DEFAULT_TEXT_SIZE);
-    setTextRotation(DEFAULT_TEXT_ROTATION);
-    setTextMirrored(false);
-    setGhostOverlay(null);
-  }, []);
-
-  const handleApplyText = React.useCallback(() => {
-    if (!textValue.trim()) {
-      enqueueSnackbar('Write some text first.', { variant: 'warning' });
-      return;
-    }
-
-    enqueueSnackbar('Click the cap surface to place your text.', {
-      variant: 'info',
-    });
-  }, [textValue]);
-
   const handleAddonSelect = React.useCallback(
     (option: (typeof TRUCKER_ADDON_OPTIONS)[number]) => {
       if (isEditorBusy) {
@@ -1277,18 +1238,14 @@ export default function Editor({ examplePath, onSettingsChange }: Props) {
             imageSize={imageSize}
             mode={mode}
             onAddonSelect={handleAddonSelect}
-            onApplyGraphics={handleApplyGraphics}
             onApplyTruckerPreset={handleApplyTruckerPreset}
-            onApplyText={handleApplyText}
             onColorChange={handleWorkingColorChange}
             onImageMirrorChange={setImageMirrored}
             onImageRotationChange={setImageRotation}
             onImageSelect={handleImageFileChange}
             onImageSizeChange={setImageSize}
             onModeChange={handleModeChange}
-            onResetGraphics={handleResetGraphics}
             onResetMaterials={handleResetMaterials}
-            onResetText={handleResetText}
             onTextChange={setTextValue}
             onTextMirrorChange={setTextMirrored}
             onTextRotationChange={setTextRotation}

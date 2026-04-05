@@ -40,18 +40,14 @@ type Props = {
   imageSize: number;
   mode: Mode;
   onAddonSelect: (option: AddonOption) => void;
-  onApplyGraphics: () => void;
   onApplyTruckerPreset: (sections: TruckerColorSections) => void;
-  onApplyText: () => void;
   onColorChange: (color: string) => void;
   onImageMirrorChange: (value: boolean) => void;
   onImageRotationChange: (value: number) => void;
   onImageSelect: (file: File) => void;
   onImageSizeChange: (value: number) => void;
   onModeChange: (mode: Mode) => void;
-  onResetGraphics: () => void;
   onResetMaterials: () => void;
-  onResetText: () => void;
   onTextChange: (value: string) => void;
   onTextMirrorChange: (value: boolean) => void;
   onTextRotationChange: (value: number) => void;
@@ -114,18 +110,14 @@ const OverlayBrushPanel = React.memo(function OverlayBrushPanel({
   imageSize,
   mode,
   onAddonSelect,
-  onApplyGraphics,
   onApplyTruckerPreset,
-  onApplyText,
   onColorChange,
   onImageMirrorChange,
   onImageRotationChange,
   onImageSelect,
   onImageSizeChange,
   onModeChange,
-  onResetGraphics,
   onResetMaterials,
-  onResetText,
   onTextChange,
   onTextMirrorChange,
   onTextRotationChange,
@@ -767,26 +759,6 @@ const OverlayBrushPanel = React.memo(function OverlayBrushPanel({
           onPrimary={() => onModeChange('mesh')}
           secondaryLabel="Reset Palette"
           onSecondary={onResetMaterials}
-          disabled={disabled}
-        />
-      )}
-
-      {activePanel === 'graphics' && (
-        <PanelActions
-          primaryLabel={imageName ? 'Apply Design' : 'Upload Graphic'}
-          onPrimary={imageName ? onApplyGraphics : openImagePicker}
-          secondaryLabel="Reset"
-          onSecondary={onResetGraphics}
-          disabled={disabled}
-        />
-      )}
-
-      {activePanel === 'text' && (
-        <PanelActions
-          primaryLabel="Apply Text"
-          onPrimary={onApplyText}
-          secondaryLabel="Reset"
-          onSecondary={onResetText}
           disabled={disabled}
         />
       )}

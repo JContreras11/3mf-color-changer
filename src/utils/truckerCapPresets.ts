@@ -74,6 +74,7 @@ type MeshEntry = {
   flatness: number;
   footprint: number;
   mesh: THREE.Mesh;
+  normalizedLabel: string;
   volume: number;
 };
 
@@ -82,6 +83,9 @@ type CapSections = {
   crown: THREE.Mesh[];
   front: THREE.Mesh[];
 };
+
+const BRIM_NAME_TOKENS = ['visera', 'visor', 'brim', 'bill', 'peak'];
+const FRONT_NAME_TOKENS = ['frontal', 'front panel', 'panel frontal', 'front'];
 
 export function applyTruckerCapPreset(
   root: THREE.Object3D,
@@ -106,6 +110,12 @@ function resolveTruckerCapSections(root: THREE.Object3D): CapSections | null {
 
   if (entries.length < 4) {
     return null;
+  }
+
+  const namedSections = resolveNamedTruckerCapSections(entries);
+
+  if (namedSections) {
+    return namedSections;
   }
 
   const overallBox = entries.reduce(
@@ -332,6 +342,7 @@ function getCapMeshEntries(capRoot: THREE.Object3D): MeshEntry[] {
     const footprint = sortedSizes[0] * sortedSizes[1];
     const volume = size.x * size.y * size.z;
     const flatness = sortedSizes[2] / Math.max(sortedSizes[0], 0.0001);
+    const normalizedLabel = normalizeMeshLabel(getMeshLabel(mesh, capRoot));
 
     entries.push({
       mesh,
@@ -340,6 +351,7 @@ function getCapMeshEntries(capRoot: THREE.Object3D): MeshEntry[] {
       footprint,
       volume,
       flatness,
+      normalizedLabel,
     });
   });
 
@@ -387,6 +399,74 @@ function getBoxCorners(box: THREE.Box3) {
     new THREE.Vector3(box.max.x, box.max.y, box.min.z),
     new THREE.Vector3(box.max.x, box.max.y, box.max.z),
   ];
+}
+
+function resolveNamedTruckerCapSections(entries: MeshEntry[]): CapSections | null {
+  const brimEntries = entries.filter((entry) =>
+    hasAnyNameToken(entry.normalizedLabel, BRIM_NAME_TOKENS)
+  );
+  const frontEntries = entries.filter((entry) =>
+    hasAnyNameToken(entry.normalizedLabel, FRONT_NAME_TOKENS)
+  );
+
+  if (brimEntries.length === 0 || frontEntries.length === 0) {
+    return null;
+  }
+
+  const brimIds = new Set(brimEntries.map((entry) => entry.mesh.uuid));
+  const frontIds = new Set(
+    frontEntries
+      .filter((entry) => !brimIds.has(entry.mesh.uuid))
+      .map((entry) => entry.mesh.uuid)
+  );
+  const crownEntries = entries.filter(
+    (entry) => !brimIds.has(entry.mesh.uuid) && !frontIds.has(entry.mesh.uuid)
+  );
+
+  if (frontIds.size === 0 || crownEntries.length === 0) {
+    return null;
+  }
+
+  return {
+    brim: brimEntries.map((entry) => entry.mesh),
+    front: entries
+      .filter((entry) => frontIds.has(entry.mesh.uuid))
+      .map((entry) => entry.mesh),
+    crown: crownEntries.map((entry) => entry.mesh),
+  };
+}
+
+function getMeshLabel(mesh: THREE.Mesh, capRoot: THREE.Object3D) {
+  const labels: string[] = [];
+  let current: THREE.Object3D | null = mesh;
+
+  while (current && current !== capRoot) {
+    if (current.name) {
+      labels.push(current.name);
+    }
+
+    current = current.parent;
+  }
+
+  return labels.join(' ');
+}
+
+function normalizeMeshLabel(value: string) {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[_-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function hasAnyNameToken(label: string, tokens: readonly string[]) {
+  if (!label) {
+    return false;
+  }
+
+  return tokens.some((token) => label.includes(token));
 }
 
 function countPaintableMeshes(object: THREE.Object3D) {

@@ -97,6 +97,7 @@ class ThreeMFLoader extends Loader {
 
 			let relsName;
 			let modelRelsName;
+			let modelSettingsName;
 			const modelPartNames = [];
 			const texturesPartNames = [];
 
@@ -139,6 +140,10 @@ class ThreeMFLoader extends Loader {
 				} else if ( file.match( /^3D\/Textures?\/.*/ ) ) {
 
 					texturesPartNames.push( file );
+
+				} else if ( file.match( /^Metadata\/model_settings\.config$/ ) ) {
+
+					modelSettingsName = file;
 
 				}
 
@@ -214,6 +219,20 @@ class ThreeMFLoader extends Loader {
 
 			}
 
+			if ( modelSettingsName ) {
+
+				const modelSettingsView = zip[ modelSettingsName ];
+
+				if ( modelSettingsView ) {
+
+					const modelSettingsText = textDecoder.decode( modelSettingsView );
+					const modelSettingsData = parseModelSettingsConfig( modelSettingsText );
+					applyModelSettingsToParts( modelParts, modelSettingsData );
+
+				}
+
+			}
+
 			return {
 				rels: rels,
 				modelRels: modelRels,
@@ -247,6 +266,146 @@ class ThreeMFLoader extends Loader {
 			}
 
 			return relationships;
+
+		}
+
+		function getDirectChildNodes( parentNode, tagName ) {
+
+			const nodes = [];
+			const expectedTagName = tagName.toLowerCase();
+
+			for ( let i = 0; i < parentNode.childNodes.length; i ++ ) {
+
+				const childNode = parentNode.childNodes[ i ];
+
+				if ( childNode.nodeType !== 1 ) continue;
+				if ( childNode.nodeName.toLowerCase() !== expectedTagName ) continue;
+
+				nodes.push( childNode );
+
+			}
+
+			return nodes;
+
+		}
+
+		function parseConfigMetadataNodes( metadataNodes ) {
+
+			const metadataData = {};
+
+			for ( let i = 0; i < metadataNodes.length; i ++ ) {
+
+				const metadataNode = metadataNodes[ i ];
+				const key = metadataNode.getAttribute( 'key' ) || metadataNode.getAttribute( 'name' );
+
+				if ( ! key ) continue;
+
+				metadataData[ key ] = metadataNode.getAttribute( 'value' ) || metadataNode.textContent || '';
+
+			}
+
+			return metadataData;
+
+		}
+
+		function parseModelSettingsConfig( fileText ) {
+
+			const xmlData = new DOMParser().parseFromString( fileText, 'application/xml' );
+			const configNode = xmlData.querySelector( 'config' );
+
+			if ( ! configNode ) {
+
+				return null;
+
+			}
+
+			const settingsData = {
+				objects: {},
+				parts: {}
+			};
+			const objectNodes = getDirectChildNodes( configNode, 'object' );
+
+			for ( let i = 0; i < objectNodes.length; i ++ ) {
+
+				const objectNode = objectNodes[ i ];
+				const objectId = objectNode.getAttribute( 'id' );
+				const objectMetadata = parseConfigMetadataNodes( getDirectChildNodes( objectNode, 'metadata' ) );
+
+				if ( objectId && 0 < Object.keys( objectMetadata ).length ) {
+
+					settingsData.objects[ objectId ] = objectMetadata;
+
+				}
+
+				const partNodes = getDirectChildNodes( objectNode, 'part' );
+
+				for ( let j = 0; j < partNodes.length; j ++ ) {
+
+					const partNode = partNodes[ j ];
+					const partId = partNode.getAttribute( 'id' );
+					const partMetadata = parseConfigMetadataNodes( getDirectChildNodes( partNode, 'metadata' ) );
+
+					if ( partId && 0 < Object.keys( partMetadata ).length ) {
+
+						settingsData.parts[ partId ] = partMetadata;
+
+					}
+
+				}
+
+			}
+
+			return settingsData;
+
+		}
+
+		function applyModelSettingsToParts( modelParts, modelSettingsData ) {
+
+			if ( ! modelSettingsData ) {
+
+				return;
+
+			}
+
+			const modelKeys = Object.keys( modelParts );
+
+			for ( let i = 0; i < modelKeys.length; i ++ ) {
+
+				const modelKey = modelKeys[ i ];
+				const modelData = modelParts[ modelKey ];
+				const objectResources = modelData.resources && modelData.resources.object;
+
+				if ( objectResources === undefined ) {
+
+					continue;
+
+				}
+
+				const objectIds = Object.keys( objectResources );
+
+				for ( let j = 0; j < objectIds.length; j ++ ) {
+
+					const objectId = objectIds[ j ];
+					const objectData = objectResources[ objectId ];
+					const objectSettings = modelSettingsData.objects[ objectId ];
+					const partSettings = modelSettingsData.parts[ objectId ];
+					const modelSettings = partSettings || objectSettings;
+
+					if ( modelSettings ) {
+
+						objectData[ 'modelSettings' ] = modelSettings;
+
+					}
+
+					if ( objectData.name === undefined && modelSettings && modelSettings.name ) {
+
+						objectData[ 'name' ] = modelSettings.name;
+
+					}
+
+				}
+
+			}
 
 		}
 
