@@ -85,10 +85,15 @@ function ReviewLayout({
   onRestart: () => void;
 }) {
   const [isPreviewReady, setIsPreviewReady] = React.useState(false);
+  const [hasMounted, setHasMounted] = React.useState(false);
 
   React.useEffect(() => {
     setIsPreviewReady(false);
   }, [reviewData.previewObject.uuid]);
+
+  React.useEffect(() => {
+    setHasMounted(true);
+  }, []);
 
   const metricItems = [
     {
@@ -351,7 +356,7 @@ function ReviewLayout({
         <Stack spacing={1.2} sx={{ mb: 3 }}>
           <DetailRow
             label="Generated"
-            value={formatDate(reviewData.generatedAt)}
+            value={hasMounted ? formatDate(reviewData.generatedAt) : '—'}
           />
           <DetailRow label="Output file" value={reviewData.downloadName} />
           <DetailRow
