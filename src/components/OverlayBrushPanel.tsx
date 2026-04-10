@@ -17,6 +17,7 @@ import React from 'react';
 import { HexColorPicker } from 'react-colorful';
 
 import type { AddonArtwork, AddonOption } from '../etc/designCatalog';
+import type { GraphicLibraryItem } from '../etc/graphicsLibrary';
 import type {
   TruckerColorPreset,
   TruckerColorSections,
@@ -30,6 +31,7 @@ type Props = {
   addonsEnabled: boolean;
   color: string;
   disabled?: boolean;
+  graphicLibraryItems: readonly GraphicLibraryItem[];
   imageName?: string;
   imageMirrored: boolean;
   imageRotation: number;
@@ -41,6 +43,7 @@ type Props = {
   onImageRotationChange: (value: number) => void;
   onImageSelect: (file: File) => void;
   onImageSizeChange: (value: number) => void;
+  onLibraryGraphicSelect: (item: GraphicLibraryItem) => void;
   onTextChange: (value: string) => void;
   onTextMirrorChange: (value: boolean) => void;
   onTextRotationChange: (value: number) => void;
@@ -72,12 +75,14 @@ const panelCopy: Record<
 > = {
   materials: {
     eyebrow: 'Material Studio',
-    title: 'Surface & Color',
-    subtitle: 'Whole Cap painting stays active while you refine the current color.',
+    title: 'Quick Combos & Materials',
+    subtitle:
+      'Start with a combo preset, then refine the active color for Whole Cap painting.',
   },
   graphics: {
-    title: 'Image/Logo Settings',
-    subtitle: 'Upload and refine your graphic placement before projecting it.',
+    title: 'Graphics Library',
+    subtitle:
+      'Pick a preloaded SVG/PNG or upload your own image, then place it on the cap.',
   },
   objects: {
     eyebrow: 'Atelier Tools',
@@ -97,6 +102,7 @@ const OverlayBrushPanel = React.memo(function OverlayBrushPanel({
   addonsEnabled,
   color,
   disabled = false,
+  graphicLibraryItems,
   imageName,
   imageMirrored,
   imageRotation,
@@ -108,6 +114,7 @@ const OverlayBrushPanel = React.memo(function OverlayBrushPanel({
   onImageRotationChange,
   onImageSelect,
   onImageSizeChange,
+  onLibraryGraphicSelect,
   onTextChange,
   onTextMirrorChange,
   onTextRotationChange,
@@ -250,6 +257,52 @@ const OverlayBrushPanel = React.memo(function OverlayBrushPanel({
 
         {activePanel === 'materials' && (
           <Stack spacing={3}>
+            {showTruckerPresets && truckerPresets.length > 0 && (
+              <Box
+                sx={{
+                  p: 2.25,
+                  borderRadius: '24px',
+                  bgcolor: alpha('#ffffff', 0.94),
+                  border: `1px solid ${alpha('#d8e2ff', 0.92)}`,
+                  boxShadow: '0 18px 36px rgba(15, 23, 42, 0.04)',
+                }}
+              >
+                <Typography
+                  sx={{
+                    fontSize: 12,
+                    fontWeight: 800,
+                    letterSpacing: '0.24em',
+                    textTransform: 'uppercase',
+                    color: '#6b7280',
+                    mb: 0.9,
+                  }}
+                >
+                  Quick trucker combos
+                </Typography>
+                <Typography
+                  sx={{
+                    color: '#4b5563',
+                    fontSize: 13,
+                    lineHeight: 1.6,
+                    mb: 2,
+                  }}
+                >
+                  Apply three coordinated colors at once: crown/back, front panel,
+                  and visor.
+                </Typography>
+                <Stack spacing={1.35}>
+                  {truckerPresets.map((preset) => (
+                    <TruckerPresetButton
+                      key={preset.id}
+                      disabled={disabled}
+                      preset={preset}
+                      onClick={() => onApplyTruckerPreset(preset.sections)}
+                    />
+                  ))}
+                </Stack>
+              </Box>
+            )}
+
             <Box
               sx={{
                 p: 2,
@@ -391,52 +444,6 @@ const OverlayBrushPanel = React.memo(function OverlayBrushPanel({
               />
             </Box>
 
-            {showTruckerPresets && truckerPresets.length > 0 && (
-              <Box
-                sx={{
-                  p: 2.25,
-                  borderRadius: '24px',
-                  bgcolor: alpha('#ffffff', 0.94),
-                  border: `1px solid ${alpha('#d8e2ff', 0.92)}`,
-                  boxShadow: '0 18px 36px rgba(15, 23, 42, 0.04)',
-                }}
-              >
-                <Typography
-                  sx={{
-                    fontSize: 12,
-                    fontWeight: 800,
-                    letterSpacing: '0.24em',
-                    textTransform: 'uppercase',
-                    color: '#6b7280',
-                    mb: 0.9,
-                  }}
-                >
-                  Quick trucker combos
-                </Typography>
-                <Typography
-                  sx={{
-                    color: '#4b5563',
-                    fontSize: 13,
-                    lineHeight: 1.6,
-                    mb: 2,
-                  }}
-                >
-                  Apply three coordinated colors at once: crown/back, front panel,
-                  and visor.
-                </Typography>
-                <Stack spacing={1.35}>
-                  {truckerPresets.map((preset) => (
-                    <TruckerPresetButton
-                      key={preset.id}
-                      disabled={disabled}
-                      preset={preset}
-                      onClick={() => onApplyTruckerPreset(preset.sections)}
-                    />
-                  ))}
-                </Stack>
-              </Box>
-            )}
-
             <InfoCard
               icon={<FormatColorFillRoundedIcon sx={{ fontSize: 20 }} />}
               title="Direct painting"
@@ -447,6 +454,81 @@ const OverlayBrushPanel = React.memo(function OverlayBrushPanel({
 
         {activePanel === 'graphics' && (
           <Stack spacing={3}>
+            <Box
+              sx={{
+                p: 2,
+                borderRadius: '24px',
+                bgcolor: alpha('#ffffff', 0.94),
+                border: `1px solid ${alpha('#d8e2ff', 0.92)}`,
+              }}
+            >
+              <Typography
+                sx={{
+                  fontSize: 12,
+                  fontWeight: 800,
+                  letterSpacing: '0.24em',
+                  textTransform: 'uppercase',
+                  color: '#6b7280',
+                  mb: 1.2,
+                }}
+              >
+                Quick graphics
+              </Typography>
+              <Box
+                sx={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+                  gap: 1,
+                }}
+              >
+                {graphicLibraryItems.map((item) => (
+                  <ButtonBase
+                    key={item.id}
+                    disabled={disabled}
+                    onClick={() => onLibraryGraphicSelect(item)}
+                    sx={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 0.7,
+                      p: 1,
+                      borderRadius: '16px',
+                      border: `1px solid ${alpha('#c1c6d7', 0.4)}`,
+                      bgcolor: alpha('#f8f9fa', 0.9),
+                      textAlign: 'center',
+                      '&:hover': {
+                        borderColor: alpha('#0058bc', 0.5),
+                        bgcolor: alpha('#edf4ff', 0.9),
+                      },
+                    }}
+                  >
+                    <Box
+                      component="img"
+                      src={item.path}
+                      alt={item.label}
+                      sx={{
+                        width: '100%',
+                        aspectRatio: '1 / 1',
+                        objectFit: 'contain',
+                        borderRadius: '12px',
+                        bgcolor: '#fff',
+                        p: 0.6,
+                      }}
+                    />
+                    <Typography
+                      sx={{
+                        color: '#4b5563',
+                        fontSize: 10.5,
+                        fontWeight: 700,
+                        lineHeight: 1.3,
+                      }}
+                    >
+                      {item.label}
+                    </Typography>
+                  </ButtonBase>
+                ))}
+              </Box>
+            </Box>
+
             <ButtonBase
               disabled={disabled}
               onClick={openImagePicker}
@@ -511,7 +593,7 @@ const OverlayBrushPanel = React.memo(function OverlayBrushPanel({
               label="Scale"
               badge={`${imageSize}%`}
               min={5}
-              max={120}
+              max={200}
               step={1}
               value={imageSize}
               disabled={disabled}
@@ -674,7 +756,7 @@ const OverlayBrushPanel = React.memo(function OverlayBrushPanel({
               label="Scale"
               badge={`${textSize}%`}
               min={5}
-              max={120}
+              max={200}
               step={1}
               value={textSize}
               disabled={disabled}

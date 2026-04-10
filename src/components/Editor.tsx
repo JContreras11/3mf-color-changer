@@ -26,6 +26,10 @@ import {
   getCapFamilyLabel,
   getSelectedAddonId,
 } from '../etc/designCatalog';
+import {
+  GRAPHICS_LIBRARY_ITEMS,
+  type GraphicLibraryItem,
+} from '../etc/graphicsLibrary';
 import { generateExportFile } from '../jobs/exportFile';
 import { createExportReviewData } from '../utils/exportReview';
 import {
@@ -38,13 +42,19 @@ import changeMeshColor from '../utils/threejs/changeMeshColor';
 import cloneObjectForHistory from '../utils/threejs/cloneObjectForHistory';
 import createImageCanvas from '../utils/threejs/createImageCanvas';
 import createTextCanvas from '../utils/threejs/createTextCanvas';
+import getPrimaryCapMeshSet from '../utils/threejs/getPrimaryCapMeshSet';
 import getFace from '../utils/threejs/getFace';
 import mirrorCanvasHorizontally from '../utils/threejs/mirrorCanvasHorizontally';
+import {
+  type FilamentImageOptions,
+  processImageForFilaments,
+} from '../utils/threejs/processImageForFilaments';
 import {
   getRasterOverlayDimensions,
   getRasterOverlayPlacement,
 } from '../utils/threejs/rasterOverlayPlacement';
 import { normalizeExamplePath } from '../utils/examplePaths';
+import ImagePreparationDialog from './ImagePreparationDialog';
 import { useEditorFile } from './EditorFileContext';
 import { useExportReview } from './ExportReviewContext';
 import ModeSelector, { DesignPanel, Mode } from './ModeSelector';
@@ -126,12 +136,19 @@ export default function Editor({ examplePath, onSettingsChange }: Props) {
   const [object, setObject, fileState] = useFile(file);
   const [mode, setMode] = React.useState<Mode>(initialMode);
   const [activePanel, setActivePanel] =
-    React.useState<DesignPanel>('objects');
+    React.useState<DesignPanel>('materials');
   const [workingColor, setWorkingColor] =
     React.useState<string>(initialWorkingColor);
   const [sourceImageCanvas, setSourceImageCanvas] =
     React.useState<HTMLCanvasElement | null>(null);
   const [imageName, setImageName] = React.useState<string>();
+  const [imagePreparationCanvas, setImagePreparationCanvas] =
+    React.useState<HTMLCanvasElement | null>(null);
+  const [imagePreparationName, setImagePreparationName] = React.useState('');
+  const [isImagePreparationOpen, setIsImagePreparationOpen] =
+    React.useState(false);
+  const [isApplyingImagePreparation, setIsApplyingImagePreparation] =
+    React.useState(false);
   const [imageSize, setImageSize] = React.useState(DEFAULT_IMAGE_SIZE);
   const [imageRotation, setImageRotation] = React.useState(
     DEFAULT_IMAGE_ROTATION
@@ -154,6 +171,9 @@ export default function Editor({ examplePath, onSettingsChange }: Props) {
   const [isPreparingExport, setIsPreparingExport] = React.useState(false);
   const [isSceneReady, setIsSceneReady] = React.useState(false);
   const [, setSceneRevision] = React.useState(0);
+  const forceCanvasRender = React.useCallback(() => {
+    setSceneRevision((prev) => prev + 1);
+  }, []);
   const canvasControlsRef = React.useRef<ThreeJsCanvasHandle | null>(null);
   const editorRef = React.useRef<HTMLDivElement>(null);
   const undoStackRef = React.useRef<THREE.Object3D[]>([]);
@@ -176,7 +196,10 @@ export default function Editor({ examplePath, onSettingsChange }: Props) {
   const isApplyingOverlay = pendingOverlayKind !== null;
   const isEditorLoading = fileState.isLoading || (!!object && !isSceneReady);
   const isEditorBusy =
-    isEditorLoading || isApplyingOverlay || isPreparingExport;
+    isEditorLoading ||
+    isApplyingOverlay ||
+    isPreparingExport ||
+    isApplyingImagePreparation;
   const modelLoadingTitle = object
     ? 'Preparing your atelier view'
     : 'Loading 3MF file';
@@ -207,6 +230,12 @@ export default function Editor({ examplePath, onSettingsChange }: Props) {
     : capFamily === 'custom'
       ? 'Curated accessory variations are currently available for the prepared Trucker Cap base. Select that silhouette from Base to explore add-ons.'
       : `Accessory-ready 3MF variations are currently prepared for the Trucker Cap base. ${capFamilyLabel} add-ons will arrive in a future version.`;
+  const primaryCapMeshSet = React.useMemo(
+    () => getPrimaryCapMeshSet(object),
+    [object]
+  );
+  const editingCapOnly =
+    activePanel === 'graphics' || activePanel === 'text';
   const imageCanvas = React.useMemo(() => {
     if (!sourceImageCanvas) {
       return null;
@@ -250,11 +279,67 @@ export default function Editor({ examplePath, onSettingsChange }: Props) {
   useEffect(() => {
     setIsSceneReady(false);
     setGhostOverlay(null);
+    setIsImagePreparationOpen(false);
+    setImagePreparationCanvas(null);
+    setImagePreparationName('');
+    setIsApplyingImagePreparation(false);
   }, [file]);
 
   useEffect(() => {
     setGhostOverlay(null);
   }, [object]);
+
+  useEffect(() => {
+    if (!object) {
+      return;
+    }
+
+    object.traverse((child) => {
+      const mesh = child as THREE.Mesh;
+
+      if (!mesh.isMesh || mesh.userData.isOverlay) {
+        return;
+      }
+
+      const shouldShow =
+        !editingCapOnly ||
+        primaryCapMeshSet.size === 0 ||
+        primaryCapMeshSet.has(mesh.uuid);
+      const materials = Array.isArray(mesh.material)
+        ? mesh.material
+        : [mesh.material];
+
+      materials.forEach((material) => {
+        const nextMaterial = material as THREE.Material & {
+          depthWrite?: boolean;
+          opacity?: number;
+          transparent?: boolean;
+          userData?: Record<string, unknown>;
+        };
+        const userData = (nextMaterial.userData ||= {});
+
+        if (userData.editorOriginalOpacity === undefined) {
+          userData.editorOriginalOpacity = nextMaterial.opacity ?? 1;
+          userData.editorOriginalTransparent = !!nextMaterial.transparent;
+          userData.editorOriginalDepthWrite = nextMaterial.depthWrite ?? true;
+        }
+
+        if (shouldShow) {
+          nextMaterial.opacity = Number(userData.editorOriginalOpacity);
+          nextMaterial.transparent = Boolean(userData.editorOriginalTransparent);
+          nextMaterial.depthWrite = Boolean(userData.editorOriginalDepthWrite);
+        } else {
+          nextMaterial.opacity = 0;
+          nextMaterial.transparent = true;
+          nextMaterial.depthWrite = false;
+        }
+
+        nextMaterial.needsUpdate = true;
+      });
+    });
+
+    forceCanvasRender();
+  }, [editingCapOnly, forceCanvasRender, object, primaryCapMeshSet]);
 
   useEffect(() => {
     if (activePanel === 'objects') {
@@ -349,6 +434,21 @@ export default function Editor({ examplePath, onSettingsChange }: Props) {
     });
   }, []);
 
+  const isMeshAvailableForProjection = React.useCallback(
+    (mesh: THREE.Mesh) => {
+      if (mesh.userData.excludeFromPainting) {
+        return false;
+      }
+
+      if (!editingCapOnly || primaryCapMeshSet.size === 0) {
+        return true;
+      }
+
+      return primaryCapMeshSet.has(mesh.uuid);
+    },
+    [editingCapOnly, primaryCapMeshSet]
+  );
+
   const handleSelect = (e: ThreeEvent<MouseEvent>) => {
     if (isEditorBusy || activePanel === 'objects') {
       return;
@@ -420,10 +520,6 @@ export default function Editor({ examplePath, onSettingsChange }: Props) {
 
   const handleWorkingColorChange = React.useCallback((color) => {
     setWorkingColor(color);
-  }, []);
-
-  const forceCanvasRender = React.useCallback(() => {
-    setSceneRevision((prev) => prev + 1);
   }, []);
 
   const handleUndo = React.useCallback(() => {
@@ -543,7 +639,7 @@ export default function Editor({ examplePath, onSettingsChange }: Props) {
 
     const mesh = e.object as THREE.Mesh;
 
-    if (mesh.userData.excludeFromPainting) {
+    if (!isMeshAvailableForProjection(mesh)) {
       return;
     }
 
@@ -578,7 +674,7 @@ export default function Editor({ examplePath, onSettingsChange }: Props) {
 
     const mesh = e.object as THREE.Mesh;
 
-    if (mesh.userData.excludeFromPainting) {
+    if (!isMeshAvailableForProjection(mesh)) {
       return;
     }
 
@@ -616,17 +712,102 @@ export default function Editor({ examplePath, onSettingsChange }: Props) {
     }
   };
 
+  const openImagePreparation = React.useCallback(
+    (canvas: HTMLCanvasElement, name: string) => {
+      setImagePreparationCanvas(canvas);
+      setImagePreparationName(name);
+      setIsImagePreparationOpen(true);
+    },
+    []
+  );
+
   const handleImageFileChange = React.useCallback(
     async (uploadedFile: File) => {
       try {
         const canvas = await createImageCanvas(uploadedFile);
-        setSourceImageCanvas(canvas);
-        setImageName(uploadedFile.name);
+        openImagePreparation(canvas, uploadedFile.name);
       } catch (error) {
         enqueueSnackbar(error.toString(), { variant: 'error' });
       }
     },
-    []
+    [openImagePreparation]
+  );
+
+  const handleLibraryGraphicSelect = React.useCallback(
+    async (item: GraphicLibraryItem) => {
+      try {
+        const response = await fetch(item.path, {
+          cache: 'force-cache',
+        });
+
+        if (!response.ok) {
+          throw new Error('Could not load the selected library graphic.');
+        }
+
+        const blob = await response.blob();
+        const fileName = `${item.id}.${item.type}`;
+        const file = new File([blob], fileName, {
+          type: blob.type || (item.type === 'svg' ? 'image/svg+xml' : 'image/png'),
+        });
+        const canvas = await createImageCanvas(file);
+
+        openImagePreparation(canvas, `${item.label} (${item.type.toUpperCase()})`);
+      } catch (error) {
+        enqueueSnackbar(error.toString(), { variant: 'error' });
+      }
+    },
+    [openImagePreparation]
+  );
+
+  const handleCancelImagePreparation = React.useCallback(() => {
+    if (isApplyingImagePreparation) {
+      return;
+    }
+
+    setIsImagePreparationOpen(false);
+    setImagePreparationCanvas(null);
+    setImagePreparationName('');
+  }, [isApplyingImagePreparation]);
+
+  const handleConfirmImagePreparation = React.useCallback(
+    async (options: FilamentImageOptions) => {
+      if (!imagePreparationCanvas) {
+        return;
+      }
+
+      setIsApplyingImagePreparation(true);
+
+      try {
+        await waitForNextPaint(1);
+
+        const { canvas, palette } = processImageForFilaments(
+          imagePreparationCanvas,
+          options
+        );
+
+        setSourceImageCanvas(canvas);
+        setImageName(imagePreparationName);
+        setIsImagePreparationOpen(false);
+        setImagePreparationCanvas(null);
+        setImagePreparationName('');
+
+        if (palette.length > 0) {
+          enqueueSnackbar(
+            `Graphic prepared with ${palette.length} mapped color${
+              palette.length === 1 ? '' : 's'
+            }.`,
+            {
+              variant: 'success',
+            }
+          );
+        }
+      } catch (error) {
+        enqueueSnackbar(error.toString(), { variant: 'error' });
+      } finally {
+        setIsApplyingImagePreparation(false);
+      }
+    },
+    [imagePreparationCanvas, imagePreparationName]
   );
 
   const handlePointerMoveModel = (e: ThreeEvent<PointerEvent>) => {
@@ -656,7 +837,7 @@ export default function Editor({ examplePath, onSettingsChange }: Props) {
 
     const mesh = e.object as THREE.Mesh;
 
-    if (mesh.userData.excludeFromPainting) {
+    if (!isMeshAvailableForProjection(mesh)) {
       setGhostOverlay(null);
       return;
     }
@@ -1179,6 +1360,7 @@ export default function Editor({ examplePath, onSettingsChange }: Props) {
             addonsEnabled={canUseCuratedAddons}
             color={workingColor}
             disabled={isEditorBusy}
+            graphicLibraryItems={GRAPHICS_LIBRARY_ITEMS}
             imageName={imageName}
             imageMirrored={imageMirrored}
             imageRotation={imageRotation}
@@ -1190,6 +1372,7 @@ export default function Editor({ examplePath, onSettingsChange }: Props) {
             onImageRotationChange={setImageRotation}
             onImageSelect={handleImageFileChange}
             onImageSizeChange={setImageSize}
+            onLibraryGraphicSelect={handleLibraryGraphicSelect}
             onTextChange={setTextValue}
             onTextMirrorChange={setTextMirrored}
             onTextRotationChange={setTextRotation}
@@ -1204,6 +1387,14 @@ export default function Editor({ examplePath, onSettingsChange }: Props) {
           />
         </Box>
       </Box>
+      <ImagePreparationDialog
+        fileName={imagePreparationName}
+        open={isImagePreparationOpen}
+        sourceCanvas={imagePreparationCanvas}
+        submitting={isApplyingImagePreparation}
+        onCancel={handleCancelImagePreparation}
+        onConfirm={handleConfirmImagePreparation}
+      />
     </PermanentDrawer>
   );
 }

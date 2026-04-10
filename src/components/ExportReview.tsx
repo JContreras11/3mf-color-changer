@@ -21,12 +21,22 @@ import CircularProgress from '@mui/material/CircularProgress';
 import Divider from '@mui/material/Divider';
 import Dialog from '@mui/material/Dialog';
 import FormControlLabel from '@mui/material/FormControlLabel';
+import InputLabel from '@mui/material/InputLabel';
+import MenuItem from '@mui/material/MenuItem';
+import Select from '@mui/material/Select';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import { alpha } from '@mui/material/styles';
 import { useRouter } from 'next/navigation';
 import { enqueueSnackbar } from 'notistack';
 import React from 'react';
+
+import {
+  MACHINE_OPTIONS,
+  getMachineByPrinterModel,
+} from '../utils/3mf/machineProfiles';
+import readMachineFrom3mf from '../utils/3mf/readMachineFrom3mf';
+import updateMachineIn3mf from '../utils/3mf/updateMachineIn3mf';
 
 const BRAND_TITLE = 'MakeYourCaps.com';
 
@@ -36,12 +46,39 @@ export default function ExportReview() {
   const { clearReviewData, reviewData } = useExportReview();
   const [isDownloadModalOpen, setIsDownloadModalOpen] = React.useState(false);
   const [hasAcceptedDisclaimer, setHasAcceptedDisclaimer] = React.useState(false);
+  const [selectedMachineId, setSelectedMachineId] = React.useState<
+    (typeof MACHINE_OPTIONS)[number]['id']
+  >('A1');
 
   React.useEffect(() => {
     if (!reviewData) {
       setIsDownloadModalOpen(false);
       setHasAcceptedDisclaimer(false);
+      setSelectedMachineId('A1');
     }
+  }, [reviewData]);
+
+  React.useEffect(() => {
+    let cancelled = false;
+
+    if (!reviewData) {
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    (async () => {
+      const machineInfo = await readMachineFrom3mf(reviewData.blob);
+      const detectedMachine = getMachineByPrinterModel(machineInfo?.printerModel);
+
+      if (!cancelled && detectedMachine) {
+        setSelectedMachineId(detectedMachine.id);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, [reviewData]);
 
   const handleOpenDownloadModal = React.useCallback(() => {
@@ -57,17 +94,37 @@ export default function ExportReview() {
     setIsDownloadModalOpen(false);
   }, []);
 
-  const handleConfirmDownload = React.useCallback(() => {
+  const handleConfirmDownload = React.useCallback(async () => {
     if (!reviewData || !hasAcceptedDisclaimer) {
       return;
     }
 
-    downloadExportBlob(reviewData.blob, reviewData.downloadName);
-    setIsDownloadModalOpen(false);
-    enqueueSnackbar('Your 3MF is ready — download started.', {
-      variant: 'success',
-    });
-  }, [hasAcceptedDisclaimer, reviewData]);
+    const selectedMachine =
+      MACHINE_OPTIONS.find((option) => option.id === selectedMachineId) ||
+      MACHINE_OPTIONS[1];
+
+    try {
+      const machineAdjustedBlob = await updateMachineIn3mf(
+        reviewData.blob,
+        selectedMachine
+      );
+
+      downloadExportBlob(machineAdjustedBlob, reviewData.downloadName);
+      setIsDownloadModalOpen(false);
+      enqueueSnackbar(
+        `Your 3MF is ready for ${selectedMachine.label} — download started.`,
+        {
+          variant: 'success',
+        }
+      );
+    } catch {
+      downloadExportBlob(reviewData.blob, reviewData.downloadName);
+      setIsDownloadModalOpen(false);
+      enqueueSnackbar('Your 3MF is ready — download started.', {
+        variant: 'success',
+      });
+    }
+  }, [hasAcceptedDisclaimer, reviewData, selectedMachineId]);
 
   const handleRestart = React.useCallback(() => {
     clearReviewData();
@@ -99,10 +156,12 @@ export default function ExportReview() {
       )}
       <DownloadDisclaimerModal
         accepted={hasAcceptedDisclaimer}
+        machineId={selectedMachineId}
         open={isDownloadModalOpen}
         onAcceptedChange={setHasAcceptedDisclaimer}
         onClose={handleCloseDownloadModal}
         onConfirm={handleConfirmDownload}
+        onMachineChange={setSelectedMachineId}
       />
     </PermanentDrawer>
   );
@@ -512,16 +571,20 @@ function EmptyReviewState({ onRestart }: { onRestart: () => void }) {
 
 function DownloadDisclaimerModal({
   accepted,
+  machineId,
   open,
   onAcceptedChange,
   onClose,
   onConfirm,
+  onMachineChange,
 }: {
   accepted: boolean;
+  machineId: (typeof MACHINE_OPTIONS)[number]['id'];
   open: boolean;
   onAcceptedChange: (value: boolean) => void;
   onClose: () => void;
   onConfirm: () => void;
+  onMachineChange: (machineId: (typeof MACHINE_OPTIONS)[number]['id']) => void;
 }) {
   return (
     <Dialog
@@ -638,6 +701,59 @@ function DownloadDisclaimerModal({
               Please confirm before downloading
             </Typography>
 
+            <Box
+              sx={{
+                mt: 2,
+                p: 1.6,
+                borderRadius: '18px',
+                bgcolor: alpha('#f8f9fa', 0.9),
+                border: `1px solid ${alpha('#d8e2ff', 0.78)}`,
+              }}
+            >
+              <InputLabel
+                sx={{
+                  position: 'static',
+                  transform: 'none',
+                  mb: 0.9,
+                  fontSize: 12,
+                  fontWeight: 700,
+                  letterSpacing: '0.14em',
+                  textTransform: 'uppercase',
+                  color: '#6b7280',
+                }}
+              >
+                Target machine
+              </InputLabel>
+              <Select
+                size="small"
+                fullWidth
+                value={machineId}
+                onChange={(event) =>
+                  onMachineChange(
+                    event.target.value as (typeof MACHINE_OPTIONS)[number]['id']
+                  )
+                }
+                sx={{
+                  bgcolor: '#fff',
+                  borderRadius: '12px',
+                  '& .MuiSelect-select': {
+                    py: 1.15,
+                    fontWeight: 700,
+                  },
+                }}
+              >
+                {MACHINE_OPTIONS.map((option) => (
+                  <MenuItem key={option.id} value={option.id}>
+                    {option.label}
+                  </MenuItem>
+                ))}
+              </Select>
+              <Typography sx={{ mt: 0.9, color: '#6b7280', fontSize: 12.5 }}>
+                We’ll keep the original 3MF metadata structure and tag this file
+                for the selected Bambu machine profile.
+              </Typography>
+            </Box>
+
             <Stack spacing={1.5} sx={{ mt: 2, color: '#4b5563' }}>
               <FormControlLabel
                 control={
@@ -668,9 +784,9 @@ function DownloadDisclaimerModal({
               />
 
               <Typography sx={{ fontSize: 14, lineHeight: 1.6 }}>
-                We are currently working on improving compatibility of saved 3MF
-                configurations with Bambu Studio, including pre-configured
-                supports and pre-painted add-ons.
+                This exporter keeps the original 3MF package structure when no
+                projected overlays are added, preserving existing metadata and
+                slicer assets.
               </Typography>
 
               <Box>
@@ -698,6 +814,9 @@ function DownloadDisclaimerModal({
                   <Box component="li">
                     Reducing the color matcher to 4–16 colors (depending on your
                     printer or preference)
+                  </Box>
+                  <Box component="li">
+                    Keeping cap and add-on as separate parts inside Bambu Studio
                   </Box>
                   <Box component="li">Enabling tree supports starting at 40°</Box>
                 </Stack>

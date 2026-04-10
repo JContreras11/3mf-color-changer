@@ -36,22 +36,22 @@ const panelItems = [
     tooltip: 'Swap into curated 3MF accessory variations for this silhouette.',
   },
   {
+    id: 'materials',
+    label: 'Materials',
+    icon: PaletteOutlinedIcon,
+    tooltip: 'Apply quick combos or paint the whole cap with your active color.',
+  },
+  {
     id: 'graphics',
-    label: 'Graphic',
+    label: 'Graphics',
     icon: ImageRoundedIcon,
-    tooltip: 'Upload logos or images and place them on the cap.',
+    tooltip: 'Use the quick SVG/PNG library or upload artwork and place it on the cap.',
   },
   {
     id: 'text',
     label: 'Text',
     icon: TextFieldsRoundedIcon,
     tooltip: 'Add editable text to the selected surface.',
-  },
-  {
-    id: 'materials',
-    label: 'Materials',
-    icon: PaletteOutlinedIcon,
-    tooltip: 'Paint the whole cap and refine its active color.',
   },
 ] as const satisfies readonly {
   icon: typeof PaletteOutlinedIcon;
