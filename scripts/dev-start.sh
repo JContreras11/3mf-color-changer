@@ -33,6 +33,9 @@ if [[ -f "$STATE_FILE" ]]; then
   exit 1
 fi
 
+pkill -f 'next dev --turbopack' >/dev/null 2>&1 || true
+pkill -f 'loclx tunnel http' >/dev/null 2>&1 || true
+
 cd "$ROOT_DIR"
 git fetch origin
 current_branch="$(git rev-parse --abbrev-ref HEAD)"
@@ -50,7 +53,9 @@ if [[ -z "$PORT" ]]; then
   exit 1
 fi
 
-nohup npm run dev -- --hostname 127.0.0.1 --port "$PORT" > "$DEV_LOG" 2>&1 &
+: > "$DEV_LOG"
+: > "$TUNNEL_LOG"
+nohup npm run dev -- --hostname 0.0.0.0 --port "$PORT" > "$DEV_LOG" 2>&1 &
 DEV_PID=$!
 
 for _ in $(seq 1 90); do
@@ -68,7 +73,7 @@ if ! curl -fsS "http://127.0.0.1:${PORT}" >/dev/null 2>&1; then
   exit 1
 fi
 
-LOCLX_ARGS=(tunnel http --to "127.0.0.1:${PORT}")
+LOCLX_ARGS=(tunnel http --to "127.0.0.1:${PORT}" -H "host:127.0.0.1:${PORT}")
 [[ -n "$SUBDOMAIN" ]] && LOCLX_ARGS+=(--subdomain "$SUBDOMAIN")
 nohup "$LOCLX_BIN" "${LOCLX_ARGS[@]}" > "$TUNNEL_LOG" 2>&1 &
 TUNNEL_PID=$!
