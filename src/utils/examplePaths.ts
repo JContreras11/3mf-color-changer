@@ -1,3 +1,5 @@
+import { withBasePath } from '@/utils/basePath';
+
 export function normalizeExamplePath(path: string) {
   const trimmedPath = path.trim();
 
@@ -9,5 +11,7 @@ export function normalizeExamplePath(path: string) {
     return trimmedPath;
   }
 
-  return trimmedPath.startsWith('/') ? trimmedPath : `/${trimmedPath}`;
+  const normalized = trimmedPath.startsWith('/') ? trimmedPath : `/${trimmedPath}`;
+
+  return withBasePath(normalized);
 }

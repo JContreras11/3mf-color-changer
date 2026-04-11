@@ -3,7 +3,6 @@ import * as THREE from 'three';
 
 import readFromFile from './readFromFile';
 import readFromUrl from './readFromUrl';
-import { normalizeExamplePath } from '../../utils/examplePaths';
 
 type UseFileState = {
   error: Error | null;
@@ -48,7 +47,7 @@ export default function useFile(
         let nextObject;
 
         if (typeof file === 'string') {
-          nextObject = await readFromUrl(normalizeExamplePath(file), {
+          nextObject = await readFromUrl(file, {
             signal: abortController.signal,
           });
         } else {
