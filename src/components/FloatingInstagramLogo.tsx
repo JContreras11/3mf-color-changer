@@ -4,6 +4,7 @@ import Box from '@mui/material/Box';
 import Tooltip from '@mui/material/Tooltip';
 import { alpha } from '@mui/material/styles';
 import Image from 'next/image';
+import { withBasePath } from '@/utils/basePath';
 import React from 'react';
 
 const BRAND_LINKS_URL = 'https://linktr.ee/3dxav';
