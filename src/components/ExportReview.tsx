@@ -6,6 +6,7 @@ import PermanentDrawer from '@/components/PermanentDrawer';
 import StaticPreviewCanvas from '@/components/threeJs/StaticPreviewCanvas';
 import { downloadExportBlob } from '@/jobs/exportFile';
 import type { ExportReviewData } from '@/utils/exportReview';
+import { withBasePath } from '@/utils/basePath';
 import AutoAwesomeRoundedIcon from '@mui/icons-material/AutoAwesomeRounded';
 import CategoryRoundedIcon from '@mui/icons-material/CategoryRounded';
 import CheckCircleRoundedIcon from '@mui/icons-material/CheckCircleRounded';
@@ -652,7 +653,7 @@ function DownloadDisclaimerModal({
           >
             <Box
               component="img"
-              src="/help.gif"
+              src={withBasePath('/help.gif')}
               alt="Bambu Studio setup recommendations preview"
               sx={{
                 display: 'block',

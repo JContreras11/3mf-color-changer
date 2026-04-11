@@ -20,6 +20,7 @@ import { useEditorFile } from './EditorFileContext';
 import { useExportReview } from './ExportReviewContext';
 import LoginDialog from './LoginDialog';
 import PermanentDrawer from './PermanentDrawer';
+import { withBasePath } from '@/utils/basePath';
 import { normalizeExamplePath } from '../utils/examplePaths';
 
 type CapOption = {
@@ -82,7 +83,7 @@ export default function HomeRoute() {
         description:
           'Classic front panel ready for logos, text and bold multi-color graphics.',
         eta: '12–18 Hours',
-        imagePath: '/caps/trucker.webp',
+        imagePath: withBasePath('/caps/trucker.webp'),
         path: 'examples/trucker/Trucker Cap Base A1.3mf',
       },
       {
@@ -94,7 +95,7 @@ export default function HomeRoute() {
         disabled: true,
         disabledLabel: 'Disabled',
         eta: '14–18 Hours',
-        imagePath: '/caps/future.webp',
+        imagePath: withBasePath('/caps/future.webp'),
         path: 'examples/future_cap.3mf',
       },
       {
@@ -106,7 +107,7 @@ export default function HomeRoute() {
         disabled: true,
         disabledLabel: 'Disabled',
         eta: '16–22 Hours',
-        imagePath: '/caps/bucket.webp',
+        imagePath: withBasePath('/caps/bucket.webp'),
         path: 'examples/bucket_hat.3mf',
       },
     ],

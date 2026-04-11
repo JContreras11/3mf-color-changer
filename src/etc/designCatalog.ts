@@ -1,3 +1,5 @@
+import { withBasePath } from '@/utils/basePath';
+
 export type CapFamily =
   | 'trucker'
   | 'future'
@@ -34,8 +36,8 @@ export const TRUCKER_ADDON_OPTIONS: AddonOption[] = [
     artwork: 'base',
     family: 'trucker',
     previewImages: {
-      side: '/caps/addons/trucker/trucker_base_side.webp',
-      front: '/caps/addons/trucker/trucker_base_front.webp',
+      side: withBasePath('/caps/addons/trucker/trucker_base_side.webp'),
+      front: withBasePath('/caps/addons/trucker/trucker_base_front.webp'),
     },
     relatedPaths: [
       'examples/trucker/Trucker Cap Base A1.3mf',
@@ -53,8 +55,8 @@ export const TRUCKER_ADDON_OPTIONS: AddonOption[] = [
     artwork: 'deer_gold',
     family: 'trucker',
     previewImages: {
-      side: '/caps/addons/trucker/trucker_deer_side.png',
-      front: '/caps/addons/trucker/trucker_deer_front.png',
+      side: withBasePath('/caps/addons/trucker/trucker_deer_side.png'),
+      front: withBasePath('/caps/addons/trucker/trucker_deer_front.png'),
     },
     relatedPaths: [
       'examples/trucker/Deer Antlers G A1.3mf',
@@ -71,8 +73,8 @@ export const TRUCKER_ADDON_OPTIONS: AddonOption[] = [
     artwork: 'deer_natural',
     family: 'trucker',
     previewImages: {
-      side: '/caps/addons/trucker/trucker_mini_deer_side.webp',
-      front: '/caps/addons/trucker/trucker_mini_deer_front.webp',
+      side: withBasePath('/caps/addons/trucker/trucker_mini_deer_side.webp'),
+      front: withBasePath('/caps/addons/trucker/trucker_mini_deer_front.webp'),
     },
     relatedPaths: [
       'examples/trucker/Deer Antlers P A1.3mf',
@@ -89,7 +91,7 @@ export const TRUCKER_ADDON_OPTIONS: AddonOption[] = [
     artwork: 'samurai',
     family: 'trucker',
     previewImages: {
-      side: '/caps/addons/trucker/trucker_samurai_side.png',
+      side: withBasePath('/caps/addons/trucker/trucker_samurai_side.png'),
     },
     relatedPaths: ['examples/trucker/Samurai A1.3mf'],
   },
@@ -101,8 +103,8 @@ export const TRUCKER_ADDON_OPTIONS: AddonOption[] = [
     artwork: 'viking',
     family: 'trucker',
     previewImages: {
-      side: '/caps/addons/trucker/trucker_horns_side.png',
-      front: '/caps/addons/trucker/trucker_horns_front.png',
+      side: withBasePath('/caps/addons/trucker/trucker_horns_side.png'),
+      front: withBasePath('/caps/addons/trucker/trucker_horns_front.png'),
     },
     relatedPaths: [
       'examples/trucker/Viking Horns A1.3mf',

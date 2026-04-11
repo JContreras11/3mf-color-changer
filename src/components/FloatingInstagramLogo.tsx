@@ -95,7 +95,7 @@ export default function FloatingInstagramLogo() {
             Created by
           </Box>
           <Image
-            src="/logo-3dxav.png"
+            src={withBasePath('/logo-3dxav.png')}
             alt="3DXAV"
             fill
             sizes="(max-width: 600px) 62px, (max-width: 900px) 72px, 84px"

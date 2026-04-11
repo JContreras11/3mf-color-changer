@@ -12,6 +12,7 @@ import { usePathname } from 'next/navigation';
 import * as React from 'react';
 
 import NextLink from './NextLink';
+import { withBasePath } from '@/utils/basePath';
 
 const drawerWidth = 340;
 const brandTitle = 'MakeYourCaps.com';
@@ -88,11 +89,11 @@ export default function PermanentDrawer({
                 gap: { xs: 1, md: 1.2 },
                 minWidth: 0,
               }}
-              href="/"
+              href={withBasePath('/')}
             >
               <Box
                 component="img"
-                src="/logo.png"
+                src={withBasePath('/logo.png')}
                 alt="MakeYourCaps.com logo"
                 sx={{
                   width: { xs: 36, sm: 40, md: 46 },
