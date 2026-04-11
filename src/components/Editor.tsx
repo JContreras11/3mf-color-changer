@@ -678,7 +678,6 @@ export default function Editor({ examplePath, onSettingsChange }: Props) {
           camera,
           root: object,
           targetMesh: mesh,
-          projectionMeshes,
           pointWorld,
           face: overlayFace,
           canvas: imageCanvas,
