@@ -130,7 +130,7 @@ export default function ExportReview() {
   const handleRestart = React.useCallback(() => {
     clearReviewData();
     clearUploadedFile();
-    router.push(withBasePath('/'));
+    router.push('/');
   }, [clearReviewData, clearUploadedFile, router]);
 
   const exportAction = (

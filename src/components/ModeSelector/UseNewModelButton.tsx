@@ -14,7 +14,6 @@ import Dialog from '@mui/material/Dialog';
 import DialogTitle from '@mui/material/DialogTitle';
 import React from 'react';
 import { useRouter } from 'next/navigation';
-import { withBasePath } from '@/utils/basePath';
 
 type Props = {
   buttonSx?: SxProps;
@@ -28,7 +27,7 @@ export default function UseNewModelButton({ buttonSx }: Props) {
     setOpen(true);
   };
   const handleCloseAndNavigate = () => {
-    router.push(withBasePath('/'));
+    router.push('/');
     setOpen(false);
   };
   const handleClose = () => {

@@ -126,7 +126,7 @@ export default function Editor({ examplePath, onSettingsChange }: Props) {
 
   useEffect(() => {
     if (!file) {
-      router.replace(withBasePath('/'));
+      router.replace('/');
     }
   }, [file, router]);
 
@@ -519,7 +519,7 @@ export default function Editor({ examplePath, onSettingsChange }: Props) {
       );
 
       shouldResetPreparingExport = false;
-      router.push(withBasePath('/export'));
+      router.push('/export');
     } catch (error) {
       enqueueSnackbar(error instanceof Error ? error.message : String(error), {
         variant: 'error',
@@ -957,7 +957,7 @@ export default function Editor({ examplePath, onSettingsChange }: Props) {
       }
 
       router.push(
-        withBasePath('/editor') + '?example=' + encodeURIComponent(normalizeExamplePath(option.path))
+        '/editor?example=' + encodeURIComponent(normalizeExamplePath(option.path))
       );
     },
     [

@@ -158,7 +158,7 @@ export default function HomeRoute() {
   ]);
 
   const getEditorRoute = React.useCallback((path: string) => {
-    return withBasePath('/editor') + '?example=' + encodeURIComponent(normalizeExamplePath(path));
+    return '/editor?example=' + encodeURIComponent(normalizeExamplePath(path));
   }, []);
 
   const handleExampleSelect = React.useCallback(
@@ -239,7 +239,7 @@ export default function HomeRoute() {
     enqueueSnackbar('Session closed. Login is required to use the app again.', {
       variant: 'info',
     });
-    router.replace(withBasePath('/'));
+    router.replace('/');
   }, [clearReviewData, clearUploadedFile, logout, router]);
 
   const headerAction = isAuthLoading ? (

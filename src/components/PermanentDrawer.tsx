@@ -89,7 +89,7 @@ export default function PermanentDrawer({
                 gap: { xs: 1, md: 1.2 },
                 minWidth: 0,
               }}
-              href={withBasePath('/')}
+              href='/'
             >
               <Box
                 component="img"
