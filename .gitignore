@@ -22,3 +22,6 @@ Thumbs.db
 .agents/*
 
 *.3mf
+
+*.md
+.openclaw/*
