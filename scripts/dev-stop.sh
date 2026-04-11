@@ -29,6 +29,10 @@ for key in ('tunnelPid', 'devPid'):
         except ProcessLookupError:
             pass
 
+origins_file = state.get('originsFile')
+if origins_file:
+    Path(origins_file).unlink(missing_ok=True)
+
 if mode == 'push':
     subprocess.run(['git', '-C', root, 'push', '-u', 'origin', branch], check=True)
 elif mode == 'discard':
