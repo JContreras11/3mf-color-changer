@@ -65,6 +65,12 @@ TUNNEL_PID=$!
 PUBLIC_URL=""
 for _ in $(seq 1 90); do
   PUBLIC_URL="$(grep -Eo 'https://[^[:space:]]+' "$TUNNEL_LOG" | head -n1 || true)"
+  if [[ -z "$PUBLIC_URL" ]]; then
+    host="$(grep -Eo '[a-zA-Z0-9.-]+\.loclx\.io' "$TUNNEL_LOG" | head -n1 || true)"
+    if [[ -n "$host" ]]; then
+      PUBLIC_URL="https://${host}"
+    fi
+  fi
   if [[ -n "$PUBLIC_URL" ]]; then
     break
   fi
