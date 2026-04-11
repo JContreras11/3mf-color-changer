@@ -16,6 +16,7 @@ import Typography from '@mui/material/Typography';
 import { alpha } from '@mui/material/styles';
 import { ThreeEvent } from '@react-three/fiber';
 import { useRouter } from 'next/navigation';
+import { withBasePath } from '@/utils/basePath';
 import { enqueueSnackbar } from 'notistack';
 import React, { useEffect } from 'react';
 import * as THREE from 'three';
@@ -125,7 +126,7 @@ export default function Editor({ examplePath, onSettingsChange }: Props) {
 
   useEffect(() => {
     if (!file) {
-      router.replace('/');
+      router.replace(withBasePath('/'));
     }
   }, [file, router]);
 
@@ -136,7 +137,7 @@ export default function Editor({ examplePath, onSettingsChange }: Props) {
   const [object, setObject, fileState] = useFile(file);
   const [mode, setMode] = React.useState<Mode>(initialMode);
   const [activePanel, setActivePanel] =
-    React.useState<DesignPanel>('materials');
+    React.useState<DesignPanel>('objects');
   const [workingColor, setWorkingColor] =
     React.useState<string>(initialWorkingColor);
   const [sourceImageCanvas, setSourceImageCanvas] =
@@ -449,6 +450,28 @@ export default function Editor({ examplePath, onSettingsChange }: Props) {
     [editingCapOnly, primaryCapMeshSet]
   );
 
+  const projectionMeshes = React.useMemo(() => {
+    if (!object) {
+      return [] as THREE.Mesh[];
+    }
+
+    const meshes: THREE.Mesh[] = [];
+
+    object.traverse((child) => {
+      const mesh = child as THREE.Mesh;
+
+      if (!mesh.isMesh) {
+        return;
+      }
+
+      if (isMeshAvailableForProjection(mesh)) {
+        meshes.push(mesh);
+      }
+    });
+
+    return meshes;
+  }, [isMeshAvailableForProjection, object]);
+
   const handleSelect = (e: ThreeEvent<MouseEvent>) => {
     if (isEditorBusy || activePanel === 'objects') {
       return;
@@ -496,7 +519,7 @@ export default function Editor({ examplePath, onSettingsChange }: Props) {
       );
 
       shouldResetPreparingExport = false;
-      router.push('/export');
+      router.push(withBasePath('/export'));
     } catch (error) {
       enqueueSnackbar(error instanceof Error ? error.message : String(error), {
         variant: 'error',
@@ -655,6 +678,7 @@ export default function Editor({ examplePath, onSettingsChange }: Props) {
           camera,
           root: object,
           targetMesh: mesh,
+          projectionMeshes,
           pointWorld,
           face: overlayFace,
           canvas: imageCanvas,
@@ -697,6 +721,7 @@ export default function Editor({ examplePath, onSettingsChange }: Props) {
             camera,
             root: object,
             targetMesh: mesh,
+            projectionMeshes,
             pointWorld,
             face: overlayFace,
             canvas: textCanvas,
@@ -934,7 +959,7 @@ export default function Editor({ examplePath, onSettingsChange }: Props) {
       }
 
       router.push(
-        '/editor?example=' + encodeURIComponent(normalizeExamplePath(option.path))
+        withBasePath('/editor') + '?example=' + encodeURIComponent(normalizeExamplePath(option.path))
       );
     },
     [

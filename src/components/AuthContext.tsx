@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { withBasePath } from '@/utils/basePath';
 
 type AuthStatus = 'loading' | 'authenticated' | 'anonymous';
 
@@ -32,7 +33,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const refreshSession = React.useCallback(async () => {
     try {
-      const response = await fetch('/api/auth/session', {
+      const response = await fetch(withBasePath('/api/auth/session'), {
         cache: 'no-store',
         credentials: 'same-origin',
       });
@@ -62,7 +63,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const login = React.useCallback(
     async ({ password, username }: LoginInput) => {
-      const response = await fetch('/api/auth/login', {
+      const response = await fetch(withBasePath('/api/auth/login'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -87,7 +88,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 
   const logout = React.useCallback(async () => {
-    await fetch('/api/auth/logout', {
+    await fetch(withBasePath('/api/auth/logout'), {
       method: 'POST',
       credentials: 'same-origin',
     }).catch(() => undefined);
