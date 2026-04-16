@@ -33,9 +33,114 @@ export async function changeColors(
   // Use a high starting ID to prevent collisions with existing resource IDs in the 3MF XML
   let nextId = 1000000;
 
+  // Extract unique colors and build mesh name -> color mapping for Bambu Slicer Extruder Injection
+  const uniqueColors: string[] = [];
+  const meshColorMap = new Map<string, string>();
+  
+  object.traverse((child) => {
+    if ((child as THREE.Mesh).isMesh) {
+      const mesh = child as THREE.Mesh;
+      
+      // Excluir "Addons" como "Samurai.stl" o "cuernos.stl" para que conserven la pintura nativa del Slicer
+      if (mesh.name && mesh.name.toLowerCase().includes('.stl')) return;
+
+      if (mesh.geometry && mesh.geometry.attributes.color) {
+        const colorArray = mesh.geometry.attributes.color.array as Float32Array;
+        if (colorArray && colorArray.length >= 3) {
+          const threeColor = new THREE.Color(colorArray[0], colorArray[1], colorArray[2]);
+          const colorHex = `#${threeColor.getHexString()}`.toUpperCase();
+          meshColorMap.set(mesh.name, colorHex);
+          if (!uniqueColors.includes(colorHex)) {
+            uniqueColors.push(colorHex);
+          }
+        }
+      }
+    }
+  });
+  if (uniqueColors.length === 0) uniqueColors.push('#FFFFFF');
+
   // Loop through all entries and add them to the new zip file. If the entry is the
   // 3dmodel.model file, we will change the colors.
   for (const entry of entries) {
+    if (entry.filename.toLowerCase() === 'metadata/project_settings.config') {
+      if ('getData' in entry && typeof entry.getData === 'function') {
+        try {
+          const textWriter = new TextWriter();
+          const configStr = await entry.getData(textWriter);
+          const config = JSON.parse(configStr);
+          
+          // OVERWRITE strategy: as requested, we map Cap colors exactly into the first N Extruders.
+          // Because Addon objects like Samurai masks map to higher Extruder slots natively (e.g. 3, 4, 5) 
+          // and we no longer extract their colors (thanks to the .stl filter!), they will naturally be preserved!
+          const existingColors = config.filament_colour || [];
+          
+          for (let i = 0; i < uniqueColors.length; i++) {
+             if (i < existingColors.length) {
+                existingColors[i] = uniqueColors[i].toUpperCase();
+             } else {
+                existingColors.push(uniqueColors[i].toUpperCase());
+                
+                // Duplicate generic properties for any new overflows
+                for (let key in config) {
+                   if (Array.isArray(config[key]) && config[key].length === existingColors.length - 1) {
+                      config[key].push(config[key][0]);
+                   }
+                }
+             }
+          }
+          config.filament_colour = existingColors;
+          
+          const patchedConfig = JSON.stringify(config, null, 4);
+          await zipWriter.add(entry.filename, new TextReader(patchedConfig));
+        } catch {
+          const writer = new BlobWriter();
+          const data = await entry.getData(writer);
+          await zipWriter.add(entry.filename, new BlobReader(data));
+        }
+      }
+      continue;
+    }
+
+    // Inject precise extruder definitions mapped to our dynamically created filaments!
+    if (entry.filename.toLowerCase() === 'metadata/model_settings.config') {
+      if ('getData' in entry && typeof entry.getData === 'function') {
+        const textWriter = new TextWriter();
+        let configXml = await entry.getData(textWriter);
+        
+        try {
+          const parser = new DOMParser();
+          const doc = parser.parseFromString(configXml, 'text/xml');
+          const parts = doc.querySelectorAll('part');
+          parts.forEach(part => {
+             const nameMeta = part.querySelector('metadata[key="name"]');
+             const name = nameMeta ? nameMeta.getAttribute('value') : null;
+             
+             if (name && meshColorMap.has(name)) {
+                const color = meshColorMap.get(name)!;
+                // Since we overwrote linearly, the Extruder index is exactly the array index + 1
+                const extruderIdx = uniqueColors.indexOf(color) + 1; 
+                
+                const existingExtruder = part.querySelector('metadata[key="extruder"]');
+                if (existingExtruder) {
+                   existingExtruder.setAttribute('value', extruderIdx.toString());
+                } else {
+                   const meta = doc.createElement('metadata');
+                   meta.setAttribute('key', 'extruder');
+                   meta.setAttribute('value', extruderIdx.toString());
+                   part.appendChild(meta);
+                }
+             }
+          });
+          configXml = new XMLSerializer().serializeToString(doc);
+          await zipWriter.add(entry.filename, new TextReader(configXml));
+        } catch (e) {
+          await zipWriter.add(entry.filename, new TextReader(configXml));
+        }
+      }
+      continue;
+    }
+
+
     // We process all .model files because 3MF objects might be stored in separate model files (e.g. 3D/Objects/A.model)
     if (!entry.filename.toLowerCase().endsWith('.model')) {
       if (!('getData' in entry) || typeof entry.getData !== 'function') {
@@ -104,7 +209,8 @@ export async function changeColors(
 
             if (triangleIdx === -1) {
               faceMismatch = true;
-              break; // This mesh does not match this XML object (e.g. fallback selected wrong object)
+              console.warn(`Face mismatch for mesh ${mesh.name} at face ${i}.`);
+              break; 
             }
 
             // Find the color of the face
@@ -124,7 +230,7 @@ export async function changeColors(
           }
 
           if (faceMismatch) {
-            return; // Skip altering this object if it doesn't match the current mesh
+            console.warn(`Face mismatch detected for ${mesh.name}. Skipping Triangle XML patching for this object, but Extruder Native Sync will still color it in Bambu Studio.`);
           }
 
           // It seems that in some cases, setting the color on the model is necessary. Otherwise
@@ -253,9 +359,9 @@ class TriangleLookup {
         used.add(i);
         const v = this.vertexCoords[i];
         if (
-          Math.abs(v.x - x) < 0.01 &&
-          Math.abs(v.y - y) < 0.01 &&
-          Math.abs(v.z - z) < 0.01
+          Math.abs(v.x - x) < 0.1 &&
+          Math.abs(v.y - y) < 0.1 &&
+          Math.abs(v.z - z) < 0.1
         ) {
           matches.push(i);
         }

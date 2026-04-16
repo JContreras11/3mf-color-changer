@@ -98,14 +98,14 @@ export default function ExportReview() {
   // Referencia para reversión: Remove this entire handler.
   const handleNativeDownload = React.useCallback(
     async (projectName: string) => {
-      if (!reviewData?.nativeBridgePath) {
+      if (!reviewData?.blob) {
         return;
       }
 
       setIsNativeDownloading(true);
 
       try {
-        await downloadOriginal3mf(reviewData.nativeBridgePath, projectName);
+        await downloadOriginal3mf(reviewData.blob, projectName);
         setIsNativeModalOpen(false);
         enqueueSnackbar(
           'Your original Bambu Studio .3MF is ready — download started.',
@@ -268,10 +268,8 @@ function ReviewLayout({
             border: `1px solid ${alpha('#334155', 0.5)}`,
           }}
         >
-          {/* [TEMPORAL] - Modo de Compatibilidad Nativa (Original .3MF) */}
-          {!useDynamicExport && reviewData.nativePreviewImages 
-            ? 'Original Factory Preview' 
-            : '3MF Preview'}
+          {/* Label de la vista 3D generada interactivamente */}
+          3MF Preview
         </Box>
 
         <Box
@@ -281,28 +279,13 @@ function ReviewLayout({
             '& canvas': {
               outline: 'none',
             },
-            ...( !useDynamicExport && reviewData.nativePreviewImages ? {
-               display: 'flex',
-               alignItems: 'center',
-               justifyContent: 'center',
-               position: 'relative',
-            } : {}),
-          }}
+            }}
         >
-          {/* [TEMPORAL] - Modo de Compatibilidad Nativa (Original .3MF) */}
-          {/* Mostrar imágenes de alta fidelidad si están disponibles para no perder los colores de fábrica en la previsualización */}
-          {!useDynamicExport && reviewData.nativePreviewImages ? (
-            <NativePreviewImage
-              src={reviewData.nativePreviewImages.side || reviewData.nativePreviewImages.front || ''}
-              alt={reviewData.variantLabel || 'Factory original preview'}
-              onLoad={() => setIsPreviewReady(true)}
-            />
-          ) : (
-            <StaticPreviewCanvas
-              geometry={reviewData.previewObject}
-              onReady={() => setIsPreviewReady(true)}
-            />
-          )}
+          {/* Usamos el Canvas real para que refleje los colores exactos */}
+          <StaticPreviewCanvas
+            geometry={reviewData.previewObject}
+            onReady={() => setIsPreviewReady(true)}
+          />
         </Box>
 
         {!isPreviewReady && (

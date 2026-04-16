@@ -31,7 +31,6 @@ import {
   type GraphicLibraryItem,
 } from '../etc/graphicsLibrary';
 import { generateExportFile } from '../jobs/exportFile';
-import { useDynamicExport } from '../utils/exportConfig';
 import { createExportReviewData } from '../utils/exportReview';
 import {
   applyTruckerCapPreset,
@@ -425,6 +424,31 @@ export default function Editor({ examplePath, onSettingsChange }: Props) {
   );
 
   useEffect(() => {
+    if (!object || !file) {
+      return;
+    }
+
+    if (object.userData.factoryColorsApplied) {
+      return;
+    }
+
+    const family = getCapFamily(file);
+    if (family === 'trucker') {
+      // Inyección pre-curada de colores (Opción A aprobada por el usuario).
+      // Aplica Classic Americana para romper con el color gris inicial del motor.
+      const factoryPreset = TRUCKER_COLOR_PRESETS[0];
+      
+      applyTruckerCapPreset(object, factoryPreset.sections);
+      
+      object.userData.factoryColorsApplied = true;
+      forceCanvasRender();
+      
+      // Capturamos esto en el primer frame para que la base del usuario empiece con color
+      pushUndoSnapshot(createHistorySnapshot(object));
+    }
+  }, [file, forceCanvasRender, object, pushUndoSnapshot, createHistorySnapshot]);
+
+  useEffect(() => {
     resetHistory();
   }, [file, resetHistory]);
 
@@ -496,16 +520,7 @@ export default function Editor({ examplePath, onSettingsChange }: Props) {
     try {
       await waitForNextPaint(2);
 
-      // [TEMPORAL] - Modo de Compatibilidad Nativa (Original .3MF)
-      // Evitamos el costoso procesamiento de malla 3D/ZIP si el modo nativo
-      // va a descartarlo de todas formas en la pantalla de ExportReview.
-      const generatedFile = useDynamicExport
-        ? await generateExportFile(file, object)
-        : {
-            blob: new Blob([], { type: 'application/octet-stream' }),
-            downloadName: 'native-fallback.3mf',
-          };
-          
+      const generatedFile = await generateExportFile(file, object);
       const previewObject = cloneObjectForHistory(object);
 
       setReviewData(

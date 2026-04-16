@@ -70,24 +70,15 @@ export function resolveOriginal3mfPath(
  *
  * The file's supports, bed layout, and filament assignment are fully preserved.
  *
- * @param originalPath  Public path of the original .3mf (e.g. "/examples/trucker/…")
+ * @param sourceBlob    The generated Blob from the exporter (usually from changeColors)
  * @param projectName   User-provided project name (used as the download filename)
  *
  * Referencia para reversión: src/jobs/exportFile.ts → downloadExportBlob()
  */
 export async function downloadOriginal3mf(
-  originalPath: string,
+  sourceBlob: Blob,
   projectName: string
 ): Promise<void> {
-  const response = await fetch(originalPath, { cache: 'no-store' });
-
-  if (!response.ok) {
-    throw new Error(
-      `Failed to fetch the original .3mf file from "${originalPath}" (HTTP ${response.status}).`
-    );
-  }
-
-  const sourceBlob = await response.blob();
   const sanitizedName = sanitizeProjectName(projectName);
   const downloadFileName = `${sanitizedName}.3mf`;
 

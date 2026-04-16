@@ -22,7 +22,6 @@ export type DesignPanel =
   | 'text';
 
 export const COMING_SOON_PANELS: readonly DesignPanel[] = [
-  'materials',
   'graphics',
   'text',
 ] as const;
@@ -46,7 +45,6 @@ const panelItems = [
     label: 'Materials',
     icon: PaletteOutlinedIcon,
     tooltip: 'Apply quick combos or paint the whole cap with your active color.',
-    comingSoon: true,
   },
   {
     id: 'graphics',
