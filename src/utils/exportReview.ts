@@ -7,6 +7,9 @@ import {
   getSelectedAddonId,
 } from '../etc/designCatalog';
 import type { GeneratedExportFile } from '../jobs/exportFile';
+// [TEMPORAL] - Modo de Compatibilidad Nativa (Original .3MF)
+// Referencia para reversión: Remove this import.
+import { resolveOriginal3mfPath } from './nativeExportBridge';
 
 export type ExportSceneStats = {
   meshCount: number;
@@ -22,6 +25,10 @@ export type ExportReviewData = GeneratedExportFile &
     sourceFileName: string;
     sourceKindLabel: string;
     variantLabel: string | null;
+    // [TEMPORAL] - Modo de Compatibilidad Nativa (Original .3MF)
+    // Path to the original .3mf for bridge-mode downloads.
+    // Referencia para reversión: Remove this field entirely.
+    nativeBridgePath: string | null;
   };
 
 export function createExportReviewData({
@@ -53,6 +60,9 @@ export function createExportReviewData({
       selectedAddon && selectedAddon.title !== 'Base'
         ? selectedAddon.title
         : null,
+    // [TEMPORAL] - Modo de Compatibilidad Nativa (Original .3MF)
+    // Referencia para reversión: Remove this line.
+    nativeBridgePath: resolveOriginal3mfPath(fileOrPath),
   };
 }
 

@@ -57,7 +57,11 @@ import { normalizeExamplePath } from '../utils/examplePaths';
 import ImagePreparationDialog from './ImagePreparationDialog';
 import { useEditorFile } from './EditorFileContext';
 import { useExportReview } from './ExportReviewContext';
-import ModeSelector, { DesignPanel, Mode } from './ModeSelector';
+import ModeSelector, {
+  COMING_SOON_PANELS,
+  DesignPanel,
+  Mode,
+} from './ModeSelector';
 import OverlayBrushPanel from './OverlayBrushPanel';
 import PermanentDrawer from './PermanentDrawer';
 import ThreeJsCanvas, { ThreeJsCanvasHandle } from './threeJs/Canvas';
@@ -71,6 +75,13 @@ const DEFAULT_TEXT_ROTATION = 0;
 const DEFAULT_TEXT_SIZE = 24;
 const DEFAULT_WORKING_COLOR = '#f00';
 const MAX_HISTORY_STEPS = 30;
+const DEFAULT_EDITOR_PANEL: DesignPanel = 'objects';
+const PANEL_TO_MODE: Record<DesignPanel, Mode> = {
+  graphics: 'image',
+  materials: 'mesh',
+  objects: 'mesh',
+  text: 'text',
+};
 
 type GhostOverlay = {
   camera: THREE.Camera;
@@ -132,11 +143,20 @@ export default function Editor({ examplePath, onSettingsChange }: Props) {
   const initialMode = initialSettingsRef.current.mode || 'mesh';
   const initialWorkingColor =
     initialSettingsRef.current.workingColor || DEFAULT_WORKING_COLOR;
+  const capFamily = React.useMemo(() => getCapFamily(file), [file]);
+  const capFamilyLabel = React.useMemo(
+    () => getCapFamilyLabel(capFamily),
+    [capFamily]
+  );
+  const selectedAddonId = React.useMemo(() => getSelectedAddonId(file), [file]);
+  const canUseCuratedAddons =
+    capFamily === 'trucker' && typeof file === 'string';
+  const defaultActivePanel: DesignPanel = DEFAULT_EDITOR_PANEL;
 
   const [object, setObject, fileState] = useFile(file);
   const [mode, setMode] = React.useState<Mode>(initialMode);
   const [activePanel, setActivePanel] =
-    React.useState<DesignPanel>('materials');
+    React.useState<DesignPanel>(defaultActivePanel);
   const [workingColor, setWorkingColor] =
     React.useState<string>(initialWorkingColor);
   const [sourceImageCanvas, setSourceImageCanvas] =
@@ -182,14 +202,6 @@ export default function Editor({ examplePath, onSettingsChange }: Props) {
   const handleModelReady = React.useCallback(() => {
     setIsSceneReady(true);
   }, []);
-  const capFamily = React.useMemo(() => getCapFamily(file), [file]);
-  const capFamilyLabel = React.useMemo(
-    () => getCapFamilyLabel(capFamily),
-    [capFamily]
-  );
-  const selectedAddonId = React.useMemo(() => getSelectedAddonId(file), [file]);
-  const canUseCuratedAddons =
-    capFamily === 'trucker' && typeof file === 'string';
   const canUndo = historyAvailability.canUndo;
   const canRedo = historyAvailability.canRedo;
   const showHistoryControls = canUndo || canRedo;
@@ -283,7 +295,22 @@ export default function Editor({ examplePath, onSettingsChange }: Props) {
     setImagePreparationCanvas(null);
     setImagePreparationName('');
     setIsApplyingImagePreparation(false);
-  }, [file]);
+    setActivePanel(defaultActivePanel);
+  }, [defaultActivePanel, file]);
+
+  useEffect(() => {
+    const nextMode = PANEL_TO_MODE[activePanel];
+
+    setMode((currentMode) =>
+      currentMode === nextMode ? currentMode : nextMode
+    );
+  }, [activePanel]);
+
+  useEffect(() => {
+    if (COMING_SOON_PANELS.includes(activePanel)) {
+      setActivePanel(DEFAULT_EDITOR_PANEL);
+    }
+  }, [activePanel]);
 
   useEffect(() => {
     setGhostOverlay(null);
@@ -417,21 +444,6 @@ export default function Editor({ examplePath, onSettingsChange }: Props) {
   const handlePanelChange = React.useCallback((panel: DesignPanel) => {
     setActivePanel(panel);
     setGhostOverlay(null);
-    setMode((currentMode) => {
-      if (panel === 'graphics') {
-        return 'image';
-      }
-
-      if (panel === 'text') {
-        return 'text';
-      }
-
-      if (panel === 'materials') {
-        return 'mesh';
-      }
-
-      return currentMode;
-    });
   }, []);
 
   const isMeshAvailableForProjection = React.useCallback(
@@ -1196,10 +1208,10 @@ export default function Editor({ examplePath, onSettingsChange }: Props) {
               height: '100%',
               overflow: 'hidden',
               borderRadius: { xs: '32px', md: '40px' },
-              border: `1px solid ${alpha('#d8e2ff', 0.78)}`,
-              boxShadow: '0 30px 90px rgba(15, 23, 42, 0.08)',
+              border: `1px solid ${alpha('#243040', 0.9)}`,
+              boxShadow: '0 36px 110px rgba(2, 6, 23, 0.34)',
               background:
-                'radial-gradient(circle at top, rgba(255,255,255,0.98) 0%, rgba(244,246,249,0.96) 46%, rgba(233,238,244,0.92) 100%)',
+                'radial-gradient(circle at top, rgba(31, 41, 55, 0.42) 0%, rgba(11, 15, 21, 0.98) 52%, rgba(4, 6, 10, 1) 100%)',
             }}
           >
             <Box
@@ -1211,13 +1223,15 @@ export default function Editor({ examplePath, onSettingsChange }: Props) {
                 px: 2,
                 py: 1,
                 borderRadius: '999px',
-                bgcolor: alpha('#ffffff', 0.88),
-                color: '#4b5563',
+                bgcolor: alpha('#04070d', 0.72),
+                color: alpha('#e5edf8', 0.9),
                 fontSize: 12,
                 fontWeight: 800,
                 letterSpacing: '0.22em',
                 textTransform: 'uppercase',
-                boxShadow: '0 12px 24px rgba(15, 23, 42, 0.06)',
+                border: `1px solid ${alpha('#8ea4c8', 0.2)}`,
+                boxShadow: '0 18px 36px rgba(2, 6, 23, 0.22)',
+                backdropFilter: 'blur(14px)',
               }}
             >
               Direct 3MF Preview
@@ -1303,7 +1317,7 @@ export default function Editor({ examplePath, onSettingsChange }: Props) {
                 transition: 'opacity 180ms ease',
                 zIndex: isEditorBusy ? 5 : -1,
                 background:
-                  'radial-gradient(circle at top, rgba(0,88,188,0.08), transparent 38%), rgba(248,249,250,0.72)',
+                  'radial-gradient(circle at top, rgba(96, 165, 250, 0.12), transparent 36%), rgba(3, 7, 13, 0.6)',
                 backdropFilter: isEditorBusy ? 'blur(10px)' : 'blur(0px)',
               }}
             >
@@ -1315,9 +1329,9 @@ export default function Editor({ examplePath, onSettingsChange }: Props) {
                   px: { xs: 3, md: 4 },
                   py: { xs: 3, md: 3.5 },
                   borderRadius: '28px',
-                  bgcolor: 'rgba(255,255,255,0.88)',
-                  boxShadow: '0 24px 80px rgba(15, 23, 42, 0.10)',
-                  border: '1px solid rgba(0, 88, 188, 0.12)',
+                  bgcolor: 'rgba(10, 14, 22, 0.88)',
+                  boxShadow: '0 32px 96px rgba(2, 6, 23, 0.34)',
+                  border: '1px solid rgba(148, 163, 184, 0.16)',
                   textAlign: 'center',
                 }}
               >
@@ -1332,7 +1346,7 @@ export default function Editor({ examplePath, onSettingsChange }: Props) {
                     fontSize: { xs: 24, md: 30 },
                     fontWeight: 800,
                     letterSpacing: '-0.04em',
-                    color: '#111827',
+                    color: '#f8fafc',
                   }}
                 >
                   {busyTitle}
@@ -1340,7 +1354,7 @@ export default function Editor({ examplePath, onSettingsChange }: Props) {
                 <Typography
                   sx={{
                     maxWidth: 360,
-                    color: '#4b5563',
+                    color: alpha('#dbe4f0', 0.84),
                     fontSize: { xs: 14, md: 15 },
                     lineHeight: 1.6,
                   }}

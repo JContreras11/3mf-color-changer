@@ -78,7 +78,7 @@ function PreviewSceneWithReady({
   return (
     <>
       <CameraControls ref={cameraControlRef} enabled={false} />
-      <Environment direction={[7, 8, 6]} showGrid={false} />
+      <Environment direction={[7, 8, 6]} />
       <Model geometry={geometry} onReady={handleModelReady} />
     </>
   );

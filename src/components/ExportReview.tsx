@@ -20,10 +20,6 @@ import Chip from '@mui/material/Chip';
 import CircularProgress from '@mui/material/CircularProgress';
 import Divider from '@mui/material/Divider';
 import Dialog from '@mui/material/Dialog';
-import FormControlLabel from '@mui/material/FormControlLabel';
-import InputLabel from '@mui/material/InputLabel';
-import MenuItem from '@mui/material/MenuItem';
-import Select from '@mui/material/Select';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import { alpha } from '@mui/material/styles';
@@ -31,12 +27,11 @@ import { useRouter } from 'next/navigation';
 import { enqueueSnackbar } from 'notistack';
 import React from 'react';
 
-import {
-  MACHINE_OPTIONS,
-  getMachineByPrinterModel,
-} from '../utils/3mf/machineProfiles';
-import readMachineFrom3mf from '../utils/3mf/readMachineFrom3mf';
-import updateMachineIn3mf from '../utils/3mf/updateMachineIn3mf';
+// [TEMPORAL] - Modo de Compatibilidad Nativa (Original .3MF)
+// Referencia para reversión: Remove these imports.
+import NativeExportModal from '@/components/NativeExportModal';
+import { useDynamicExport } from '@/utils/exportConfig';
+import { downloadOriginal3mf } from '@/utils/nativeExportBridge';
 
 const BRAND_TITLE = 'MakeYourCaps.com';
 
@@ -46,43 +41,34 @@ export default function ExportReview() {
   const { clearReviewData, reviewData } = useExportReview();
   const [isDownloadModalOpen, setIsDownloadModalOpen] = React.useState(false);
   const [hasAcceptedDisclaimer, setHasAcceptedDisclaimer] = React.useState(false);
-  const [selectedMachineId, setSelectedMachineId] = React.useState<
-    (typeof MACHINE_OPTIONS)[number]['id']
-  >('A1');
+
+  // [TEMPORAL] - Modo de Compatibilidad Nativa (Original .3MF)
+  // State for the native export bridge modal.
+  // Referencia para reversión: Remove these three states and the NativeExportModal below.
+  const [isNativeModalOpen, setIsNativeModalOpen] = React.useState(false);
+  const [isNativeDownloading, setIsNativeDownloading] = React.useState(false);
 
   React.useEffect(() => {
     if (!reviewData) {
       setIsDownloadModalOpen(false);
       setHasAcceptedDisclaimer(false);
-      setSelectedMachineId('A1');
+      // [TEMPORAL] bridge cleanup
+      setIsNativeModalOpen(false);
+      setIsNativeDownloading(false);
     }
-  }, [reviewData]);
-
-  React.useEffect(() => {
-    let cancelled = false;
-
-    if (!reviewData) {
-      return () => {
-        cancelled = true;
-      };
-    }
-
-    (async () => {
-      const machineInfo = await readMachineFrom3mf(reviewData.blob);
-      const detectedMachine = getMachineByPrinterModel(machineInfo?.printerModel);
-
-      if (!cancelled && detectedMachine) {
-        setSelectedMachineId(detectedMachine.id);
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
   }, [reviewData]);
 
   const handleOpenDownloadModal = React.useCallback(() => {
     if (!reviewData) {
+      return;
+    }
+
+    // [TEMPORAL] - Modo de Compatibilidad Nativa (Original .3MF)
+    // When bridge mode is active and a native path exists, open the
+    // project-name modal instead of the disclaimer modal.
+    // Referencia para reversión: Remove this conditional block.
+    if (!useDynamicExport && reviewData.nativeBridgePath) {
+      setIsNativeModalOpen(true);
       return;
     }
 
@@ -99,32 +85,42 @@ export default function ExportReview() {
       return;
     }
 
-    const selectedMachine =
-      MACHINE_OPTIONS.find((option) => option.id === selectedMachineId) ||
-      MACHINE_OPTIONS[1];
+    downloadExportBlob(reviewData.blob, reviewData.downloadName);
+    setIsDownloadModalOpen(false);
+    enqueueSnackbar('Your 3MF is ready — download started.', {
+      variant: 'success',
+    });
+  }, [hasAcceptedDisclaimer, reviewData]);
 
-    try {
-      const machineAdjustedBlob = await updateMachineIn3mf(
-        reviewData.blob,
-        selectedMachine
-      );
+  // [TEMPORAL] - Modo de Compatibilidad Nativa (Original .3MF)
+  // Downloads the original .3mf file with user-supplied project name.
+  // Referencia para reversión: Remove this entire handler.
+  const handleNativeDownload = React.useCallback(
+    async (projectName: string) => {
+      if (!reviewData?.nativeBridgePath) {
+        return;
+      }
 
-      downloadExportBlob(machineAdjustedBlob, reviewData.downloadName);
-      setIsDownloadModalOpen(false);
-      enqueueSnackbar(
-        `Your 3MF is ready for ${selectedMachine.label} — download started.`,
-        {
-          variant: 'success',
-        }
-      );
-    } catch {
-      downloadExportBlob(reviewData.blob, reviewData.downloadName);
-      setIsDownloadModalOpen(false);
-      enqueueSnackbar('Your 3MF is ready — download started.', {
-        variant: 'success',
-      });
-    }
-  }, [hasAcceptedDisclaimer, reviewData, selectedMachineId]);
+      setIsNativeDownloading(true);
+
+      try {
+        await downloadOriginal3mf(reviewData.nativeBridgePath, projectName);
+        setIsNativeModalOpen(false);
+        enqueueSnackbar(
+          'Your original Bambu Studio .3MF is ready — download started.',
+          { variant: 'success' }
+        );
+      } catch (error) {
+        enqueueSnackbar(
+          error instanceof Error ? error.message : String(error),
+          { variant: 'error' }
+        );
+      } finally {
+        setIsNativeDownloading(false);
+      }
+    },
+    [reviewData]
+  );
 
   const handleRestart = React.useCallback(() => {
     clearReviewData();
@@ -156,12 +152,18 @@ export default function ExportReview() {
       )}
       <DownloadDisclaimerModal
         accepted={hasAcceptedDisclaimer}
-        machineId={selectedMachineId}
         open={isDownloadModalOpen}
         onAcceptedChange={setHasAcceptedDisclaimer}
         onClose={handleCloseDownloadModal}
         onConfirm={handleConfirmDownload}
-        onMachineChange={setSelectedMachineId}
+      />
+      {/* [TEMPORAL] - Modo de Compatibilidad Nativa (Original .3MF) */}
+      {/* Referencia para reversión: Remove this NativeExportModal block. */}
+      <NativeExportModal
+        isDownloading={isNativeDownloading}
+        open={isNativeModalOpen}
+        onClose={() => setIsNativeModalOpen(false)}
+        onDownload={handleNativeDownload}
       />
     </PermanentDrawer>
   );
@@ -239,10 +241,9 @@ function ReviewLayout({
           minHeight: { xs: 460, lg: 0 },
           overflow: 'hidden',
           borderRadius: { xs: '32px', md: '40px' },
-          border: `1px solid ${alpha('#d8e2ff', 0.82)}`,
-          boxShadow: '0 30px 90px rgba(15, 23, 42, 0.08)',
-          background:
-            'radial-gradient(circle at top, rgba(255,255,255,0.98) 0%, rgba(244,246,249,0.96) 46%, rgba(233,238,244,0.92) 100%)',
+          border: `1px solid ${alpha('#1e293b', 0.7)}`,
+          boxShadow: '0 30px 90px rgba(0, 0, 0, 0.35)',
+          background: '#080c14',
         }}
         aria-busy={!isPreviewReady}
       >
@@ -255,16 +256,18 @@ function ReviewLayout({
             px: 2,
             py: 1,
             borderRadius: '999px',
-            bgcolor: alpha('#ffffff', 0.88),
-            color: '#4b5563',
+            bgcolor: alpha('#0f1629', 0.78),
+            backdropFilter: 'blur(12px)',
+            color: alpha('#94a3b8', 0.92),
             fontSize: 12,
             fontWeight: 800,
             letterSpacing: '0.22em',
             textTransform: 'uppercase',
-            boxShadow: '0 12px 24px rgba(15, 23, 42, 0.06)',
+            boxShadow: '0 12px 24px rgba(0, 0, 0, 0.28)',
+            border: `1px solid ${alpha('#334155', 0.5)}`,
           }}
         >
-          Generated 3MF Isometric
+          3MF Preview
         </Box>
 
         <Box
@@ -292,7 +295,7 @@ function ReviewLayout({
               placeItems: 'center',
               px: 3,
               background:
-                'linear-gradient(180deg, rgba(255,255,255,0.70) 0%, rgba(248,250,253,0.86) 100%)',
+                'linear-gradient(180deg, rgba(8,12,20,0.75) 0%, rgba(8,12,20,0.90) 100%)',
               backdropFilter: 'blur(8px)',
             }}
           >
@@ -303,34 +306,34 @@ function ReviewLayout({
                 width: 'min(100%, 360px)',
                 p: { xs: 2.5, md: 3 },
                 borderRadius: '28px',
-                bgcolor: alpha('#ffffff', 0.9),
-                border: `1px solid ${alpha('#d8e2ff', 0.9)}`,
-                boxShadow: '0 24px 60px rgba(15, 23, 42, 0.08)',
+                bgcolor: alpha('#141b2d', 0.92),
+                border: `1px solid ${alpha('#334155', 0.7)}`,
+                boxShadow: '0 24px 60px rgba(0, 0, 0, 0.35)',
                 textAlign: 'center',
               }}
             >
-              <CircularProgress size={34} thickness={4.6} />
+              <CircularProgress size={34} thickness={4.6} sx={{ color: '#3b82f6' }} />
               <Box>
                 <Typography
                   sx={{
                     fontFamily: '"Manrope", "Inter", sans-serif',
                     fontWeight: 800,
                     fontSize: { xs: 16, md: 18 },
-                    color: '#111827',
+                    color: '#e2e8f0',
                     letterSpacing: '-0.03em',
                   }}
                 >
-                  Loading generated 3MF
+                  Loading 3MF preview
                 </Typography>
                 <Typography
                   sx={{
                     mt: 0.8,
-                    color: '#4b5563',
+                    color: '#8b9dc3',
                     fontSize: 14,
                     lineHeight: 1.65,
                   }}
                 >
-                  Preparing the left preview panel so you can inspect the final
+                  Preparing the preview panel so you can inspect the final
                   isometric result.
                 </Typography>
               </Box>
@@ -360,15 +363,15 @@ function ReviewLayout({
                 px: 2,
                 py: 1.1,
                 borderRadius: '999px',
-                bgcolor: alpha('#ffffff', 0.86),
+                bgcolor: alpha('#0f1629', 0.72),
                 backdropFilter: 'blur(18px)',
-                border: `1px solid ${alpha('#d7def0', 0.92)}`,
-                boxShadow: '0 16px 30px rgba(15, 23, 42, 0.08)',
+                border: `1px solid ${alpha('#334155', 0.5)}`,
+                boxShadow: '0 16px 30px rgba(0, 0, 0, 0.28)',
               }}
             >
               <Typography
                 sx={{
-                  color: '#4b5563',
+                  color: alpha('#94a3b8', 0.88),
                   fontSize: 12,
                   fontWeight: 700,
                   letterSpacing: '0.14em',
@@ -571,20 +574,16 @@ function EmptyReviewState({ onRestart }: { onRestart: () => void }) {
 
 function DownloadDisclaimerModal({
   accepted,
-  machineId,
   open,
   onAcceptedChange,
   onClose,
   onConfirm,
-  onMachineChange,
 }: {
   accepted: boolean;
-  machineId: (typeof MACHINE_OPTIONS)[number]['id'];
   open: boolean;
   onAcceptedChange: (value: boolean) => void;
   onClose: () => void;
   onConfirm: () => void;
-  onMachineChange: (machineId: (typeof MACHINE_OPTIONS)[number]['id']) => void;
 }) {
   return (
     <Dialog
@@ -701,88 +700,7 @@ function DownloadDisclaimerModal({
               Please confirm before downloading
             </Typography>
 
-            <Box
-              sx={{
-                mt: 2,
-                p: 1.6,
-                borderRadius: '18px',
-                bgcolor: alpha('#f8f9fa', 0.9),
-                border: `1px solid ${alpha('#d8e2ff', 0.78)}`,
-              }}
-            >
-              <InputLabel
-                sx={{
-                  position: 'static',
-                  transform: 'none',
-                  mb: 0.9,
-                  fontSize: 12,
-                  fontWeight: 700,
-                  letterSpacing: '0.14em',
-                  textTransform: 'uppercase',
-                  color: '#6b7280',
-                }}
-              >
-                Target machine
-              </InputLabel>
-              <Select
-                size="small"
-                fullWidth
-                value={machineId}
-                onChange={(event) =>
-                  onMachineChange(
-                    event.target.value as (typeof MACHINE_OPTIONS)[number]['id']
-                  )
-                }
-                sx={{
-                  bgcolor: '#fff',
-                  borderRadius: '12px',
-                  '& .MuiSelect-select': {
-                    py: 1.15,
-                    fontWeight: 700,
-                  },
-                }}
-              >
-                {MACHINE_OPTIONS.map((option) => (
-                  <MenuItem key={option.id} value={option.id}>
-                    {option.label}
-                  </MenuItem>
-                ))}
-              </Select>
-              <Typography sx={{ mt: 0.9, color: '#6b7280', fontSize: 12.5 }}>
-                We’ll keep the original 3MF metadata structure and tag this file
-                for the selected Bambu machine profile.
-              </Typography>
-            </Box>
-
             <Stack spacing={1.5} sx={{ mt: 2, color: '#4b5563' }}>
-              <FormControlLabel
-                control={
-                  <Checkbox
-                    size="small"
-                    checked={accepted}
-                    onChange={(event) => onAcceptedChange(event.target.checked)}
-                    sx={{
-                      alignSelf: 'flex-start',
-                      mt: 0.15,
-                      color: alpha('#0058bc', 0.54),
-                      '&.Mui-checked': {
-                        color: '#0058bc',
-                      },
-                    }}
-                  />
-                }
-                sx={{
-                  alignItems: 'flex-start',
-                  m: 0,
-                  '& .MuiFormControlLabel-label': {
-                    fontSize: 14,
-                    lineHeight: 1.6,
-                    color: '#334155',
-                  },
-                }}
-                label="By using MakeYourCaps, you acknowledge that the generated digital files (such as 3MF) are intended for personal use only and must not be shared, redistributed, or sold in any form."
-              />
-
               <Typography sx={{ fontSize: 14, lineHeight: 1.6 }}>
                 This exporter keeps the original 3MF package structure when no
                 projected overlays are added, preserving existing metadata and
@@ -826,6 +744,45 @@ function DownloadDisclaimerModal({
                 We’re continuously improving the experience to make it smoother
                 and more reliable.
               </Typography>
+
+
+              <Box
+                sx={{
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: 1.2,
+                }}
+              >
+                <Checkbox
+                  size="small"
+                  checked={accepted}
+                  onChange={(event) => onAcceptedChange(event.target.checked)}
+                  inputProps={{
+                    'aria-label': 'Acknowledge personal-use-only export terms',
+                  }}
+                  sx={{
+                    mt: 0.15,
+                    p: 0.25,
+                    color: alpha('#0058bc', 0.54),
+                    '&.Mui-checked': {
+                      color: '#0058bc',
+                    },
+                  }}
+                />
+                <Typography
+                  sx={{
+                    fontSize: 14,
+                    lineHeight: 1.6,
+                    color: '#334155',
+                  }}
+                >
+                  By using MakeYourCaps, you acknowledge that the generated
+                  digital files (such as 3MF) are intended for personal use
+                  only and must not be shared, redistributed, or sold in any
+                  form.
+                </Typography>
+              </Box>
+
             </Stack>
           </Box>
 

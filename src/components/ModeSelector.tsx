@@ -21,6 +21,12 @@ export type DesignPanel =
   | 'objects'
   | 'text';
 
+export const COMING_SOON_PANELS: readonly DesignPanel[] = [
+  'materials',
+  'graphics',
+  'text',
+] as const;
+
 type Props = {
   activePanel: DesignPanel;
   disabled?: boolean;
@@ -40,20 +46,24 @@ const panelItems = [
     label: 'Materials',
     icon: PaletteOutlinedIcon,
     tooltip: 'Apply quick combos or paint the whole cap with your active color.',
+    comingSoon: true,
   },
   {
     id: 'graphics',
     label: 'Graphics',
     icon: ImageRoundedIcon,
     tooltip: 'Use the quick SVG/PNG library or upload artwork and place it on the cap.',
+    comingSoon: true,
   },
   {
     id: 'text',
     label: 'Text',
     icon: TextFieldsRoundedIcon,
     tooltip: 'Add editable text to the selected surface.',
+    comingSoon: true,
   },
 ] as const satisfies readonly {
+  comingSoon?: boolean;
   icon: typeof PaletteOutlinedIcon;
   id: DesignPanel;
   label: string;
@@ -83,19 +93,21 @@ const ModeSelector = React.memo(function ModeSelector({
       }}
     >
       {panelItems.map((item) => {
-        const active = item.id === activePanel;
+        const itemDisabled = disabled || !!item.comingSoon;
+        const active = item.id === activePanel && !itemDisabled;
         const Icon = item.icon;
+        const tooltipTitle = item.comingSoon ? 'Coming soon' : item.tooltip;
 
         return (
           <Tooltip
             key={item.id}
-            title={item.tooltip}
+            title={tooltipTitle}
             placement="right"
             disableInteractive
           >
             <Box component="span" sx={{ display: 'block' }}>
               <ButtonBase
-                disabled={disabled}
+                disabled={itemDisabled}
                 onClick={() => onPanelChange(item.id)}
                 sx={{
                   width: '100%',
@@ -104,12 +116,12 @@ const ModeSelector = React.memo(function ModeSelector({
                   py: 1.25,
                   display: 'flex',
                   flexDirection: 'column',
-                  gap: 1,
+                  gap: 0.8,
                   transition:
                     'transform 180ms ease, background-color 180ms ease, opacity 180ms ease',
-                  opacity: disabled ? 0.5 : 1,
+                  opacity: itemDisabled ? 0.5 : 1,
                   '&:hover': {
-                    transform: disabled ? 'none' : 'translateY(-1px)',
+                    transform: itemDisabled ? 'none' : 'translateY(-1px)',
                   },
                 }}
               >
@@ -144,6 +156,21 @@ const ModeSelector = React.memo(function ModeSelector({
                 >
                   {item.label}
                 </Typography>
+                {item.comingSoon && (
+                  <Typography
+                    sx={{
+                      fontSize: { xs: 7.5, md: 8 },
+                      fontWeight: 800,
+                      letterSpacing: '0.18em',
+                      textTransform: 'uppercase',
+                      color: alpha('#414755', 0.58),
+                      lineHeight: 1.2,
+                      textAlign: 'center',
+                    }}
+                  >
+                    Coming soon
+                  </Typography>
+                )}
               </ButtonBase>
             </Box>
           </Tooltip>
