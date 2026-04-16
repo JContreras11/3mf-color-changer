@@ -30,6 +30,7 @@ import React from 'react';
 // [TEMPORAL] - Modo de Compatibilidad Nativa (Original .3MF)
 // Referencia para reversión: Remove these imports.
 import NativeExportModal from '@/components/NativeExportModal';
+import NativePreviewImage from '@/components/NativePreviewImage';
 import { useDynamicExport } from '@/utils/exportConfig';
 import { downloadOriginal3mf } from '@/utils/nativeExportBridge';
 
@@ -267,7 +268,10 @@ function ReviewLayout({
             border: `1px solid ${alpha('#334155', 0.5)}`,
           }}
         >
-          3MF Preview
+          {/* [TEMPORAL] - Modo de Compatibilidad Nativa (Original .3MF) */}
+          {!useDynamicExport && reviewData.nativePreviewImages 
+            ? 'Original Factory Preview' 
+            : '3MF Preview'}
         </Box>
 
         <Box
@@ -277,12 +281,28 @@ function ReviewLayout({
             '& canvas': {
               outline: 'none',
             },
+            ...( !useDynamicExport && reviewData.nativePreviewImages ? {
+               display: 'flex',
+               alignItems: 'center',
+               justifyContent: 'center',
+               position: 'relative',
+            } : {}),
           }}
         >
-          <StaticPreviewCanvas
-            geometry={reviewData.previewObject}
-            onReady={() => setIsPreviewReady(true)}
-          />
+          {/* [TEMPORAL] - Modo de Compatibilidad Nativa (Original .3MF) */}
+          {/* Mostrar imágenes de alta fidelidad si están disponibles para no perder los colores de fábrica en la previsualización */}
+          {!useDynamicExport && reviewData.nativePreviewImages ? (
+            <NativePreviewImage
+              src={reviewData.nativePreviewImages.side || reviewData.nativePreviewImages.front || ''}
+              alt={reviewData.variantLabel || 'Factory original preview'}
+              onLoad={() => setIsPreviewReady(true)}
+            />
+          ) : (
+            <StaticPreviewCanvas
+              geometry={reviewData.previewObject}
+              onReady={() => setIsPreviewReady(true)}
+            />
+          )}
         </Box>
 
         {!isPreviewReady && (

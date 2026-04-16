@@ -29,6 +29,7 @@ export type ExportReviewData = GeneratedExportFile &
     // Path to the original .3mf for bridge-mode downloads.
     // Referencia para reversión: Remove this field entirely.
     nativeBridgePath: string | null;
+    nativePreviewImages?: { front?: string; side?: string };
   };
 
 export function createExportReviewData({
@@ -63,6 +64,7 @@ export function createExportReviewData({
     // [TEMPORAL] - Modo de Compatibilidad Nativa (Original .3MF)
     // Referencia para reversión: Remove this line.
     nativeBridgePath: resolveOriginal3mfPath(fileOrPath),
+    nativePreviewImages: selectedAddon?.previewImages,
   };
 }
 

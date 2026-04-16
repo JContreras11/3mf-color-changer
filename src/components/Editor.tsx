@@ -31,6 +31,7 @@ import {
   type GraphicLibraryItem,
 } from '../etc/graphicsLibrary';
 import { generateExportFile } from '../jobs/exportFile';
+import { useDynamicExport } from '../utils/exportConfig';
 import { createExportReviewData } from '../utils/exportReview';
 import {
   applyTruckerCapPreset,
@@ -495,7 +496,16 @@ export default function Editor({ examplePath, onSettingsChange }: Props) {
     try {
       await waitForNextPaint(2);
 
-      const generatedFile = await generateExportFile(file, object);
+      // [TEMPORAL] - Modo de Compatibilidad Nativa (Original .3MF)
+      // Evitamos el costoso procesamiento de malla 3D/ZIP si el modo nativo
+      // va a descartarlo de todas formas en la pantalla de ExportReview.
+      const generatedFile = useDynamicExport
+        ? await generateExportFile(file, object)
+        : {
+            blob: new Blob([], { type: 'application/octet-stream' }),
+            downloadName: 'native-fallback.3mf',
+          };
+          
       const previewObject = cloneObjectForHistory(object);
 
       setReviewData(
