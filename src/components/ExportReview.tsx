@@ -244,7 +244,7 @@ function ReviewLayout({
           borderRadius: { xs: '32px', md: '40px' },
           border: `1px solid ${alpha('#1e293b', 0.7)}`,
           boxShadow: '0 30px 90px rgba(0, 0, 0, 0.35)',
-          background: '#080c14',
+          background: '#5a5a5a',
         }}
         aria-busy={!isPreviewReady}
       >
@@ -297,9 +297,8 @@ function ReviewLayout({
               display: 'grid',
               placeItems: 'center',
               px: 3,
-              background:
-                'linear-gradient(180deg, rgba(8,12,20,0.75) 0%, rgba(8,12,20,0.90) 100%)',
-              backdropFilter: 'blur(8px)',
+              background: alpha('#f3f4f6', 0.6),
+              backdropFilter: 'blur(12px)',
             }}
           >
             <Stack
@@ -309,20 +308,20 @@ function ReviewLayout({
                 width: 'min(100%, 360px)',
                 p: { xs: 2.5, md: 3 },
                 borderRadius: '28px',
-                bgcolor: alpha('#141b2d', 0.92),
-                border: `1px solid ${alpha('#334155', 0.7)}`,
-                boxShadow: '0 24px 60px rgba(0, 0, 0, 0.35)',
+                bgcolor: alpha('#ffffff', 0.94),
+                border: '1px solid rgba(0, 0, 0, 0.08)',
+                boxShadow: '0 24px 60px rgba(0, 0, 0, 0.12)',
                 textAlign: 'center',
               }}
             >
-              <CircularProgress size={34} thickness={4.6} sx={{ color: '#3b82f6' }} />
+              <CircularProgress size={34} thickness={4.6} sx={{ color: '#0058bc' }} />
               <Box>
                 <Typography
                   sx={{
                     fontFamily: '"Manrope", "Inter", sans-serif',
                     fontWeight: 800,
                     fontSize: { xs: 16, md: 18 },
-                    color: '#e2e8f0',
+                    color: '#111827',
                     letterSpacing: '-0.03em',
                   }}
                 >
@@ -331,7 +330,7 @@ function ReviewLayout({
                 <Typography
                   sx={{
                     mt: 0.8,
-                    color: '#8b9dc3',
+                    color: '#4b5563',
                     fontSize: 14,
                     lineHeight: 1.65,
                   }}

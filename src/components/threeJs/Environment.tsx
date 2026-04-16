@@ -13,12 +13,12 @@ export const Environment = memo(function Environment({
   /* eslint-disable react/no-unknown-property */
   return (
     <>
-      <color attach="background" args={['#05070b']} />
-      <fog attach="fog" args={['#05070b', 11, 26]} />
+      <color attach="background" args={['#5a5a5a']} />
+      <fog attach="fog" args={['#5a5a5a', 11, 32]} />
       <hemisphereLight
-        color="#d7def1"
-        groundColor="#05070b"
-        intensity={0.45}
+        color="#ffffff"
+        groundColor="#5a5a5a"
+        intensity={0.65}
       />
       <ambientLight intensity={0.38} />
       <directionalLight
@@ -58,8 +58,8 @@ export const Environment = memo(function Environment({
       {showGrid && (
         <Grid
           infiniteGrid={true}
-          sectionColor="#1b2533"
-          cellColor="#0f151f"
+          sectionColor="#444444"
+          cellColor="#505050"
           fadeDistance={24}
           fadeStrength={1.2}
         />

@@ -1224,7 +1224,7 @@ export default function Editor({ examplePath, onSettingsChange }: Props) {
             position: 'relative',
             minWidth: 0,
             minHeight: { xs: 420, lg: 0 },
-            pl: { xs: 0, sm: 9.5, md: 11 },
+            pl: { xs: 0, sm: 13, md: 14, xl: 15 },
           }}
         >
           <Box
@@ -1235,8 +1235,7 @@ export default function Editor({ examplePath, onSettingsChange }: Props) {
               borderRadius: { xs: '32px', md: '40px' },
               border: `1px solid ${alpha('#243040', 0.9)}`,
               boxShadow: '0 36px 110px rgba(2, 6, 23, 0.34)',
-              background:
-                'radial-gradient(circle at top, rgba(31, 41, 55, 0.42) 0%, rgba(11, 15, 21, 0.98) 52%, rgba(4, 6, 10, 1) 100%)',
+              background: '#5a5a5a',
             }}
           >
             <Box
@@ -1341,9 +1340,8 @@ export default function Editor({ examplePath, onSettingsChange }: Props) {
                 pointerEvents: 'none',
                 transition: 'opacity 180ms ease',
                 zIndex: isEditorBusy ? 5 : -1,
-                background:
-                  'radial-gradient(circle at top, rgba(96, 165, 250, 0.12), transparent 36%), rgba(3, 7, 13, 0.6)',
-                backdropFilter: isEditorBusy ? 'blur(10px)' : 'blur(0px)',
+                background: alpha('#f3f4f6', 0.6),
+                backdropFilter: isEditorBusy ? 'blur(12px)' : 'blur(0px)',
               }}
             >
               <Stack
@@ -1354,9 +1352,9 @@ export default function Editor({ examplePath, onSettingsChange }: Props) {
                   px: { xs: 3, md: 4 },
                   py: { xs: 3, md: 3.5 },
                   borderRadius: '28px',
-                  bgcolor: 'rgba(10, 14, 22, 0.88)',
-                  boxShadow: '0 32px 96px rgba(2, 6, 23, 0.34)',
-                  border: '1px solid rgba(148, 163, 184, 0.16)',
+                  bgcolor: alpha('#ffffff', 0.94),
+                  boxShadow: '0 32px 96px rgba(0, 0, 0, 0.12)',
+                  border: '1px solid rgba(0, 0, 0, 0.08)',
                   textAlign: 'center',
                 }}
               >
@@ -1371,7 +1369,7 @@ export default function Editor({ examplePath, onSettingsChange }: Props) {
                     fontSize: { xs: 24, md: 30 },
                     fontWeight: 800,
                     letterSpacing: '-0.04em',
-                    color: '#f8fafc',
+                    color: '#111827',
                   }}
                 >
                   {busyTitle}
@@ -1379,7 +1377,7 @@ export default function Editor({ examplePath, onSettingsChange }: Props) {
                 <Typography
                   sx={{
                     maxWidth: 360,
-                    color: alpha('#dbe4f0', 0.84),
+                    color: '#4b5563',
                     fontSize: { xs: 14, md: 15 },
                     lineHeight: 1.6,
                   }}
