@@ -79,6 +79,25 @@ const ThreeJsCanvas = React.forwardRef<ThreeJsCanvasHandle, Props>(
       await cameraControlRef.current.fitToSphere(geometry, true);
       await cameraControlRef.current.rotate(0, initialViewTilt, true);
       await cameraControlRef.current.zoom(initialViewZoomStep, true);
+
+      // Shift the camera slightly upwards so the hat renders about 20px lower on the screen.
+      // This also conveniently raises the pivot point closer to the crown of the cap.
+      const currentTarget = new THREE.Vector3();
+      cameraControlRef.current.getTarget(currentTarget);
+      const currentPos = new THREE.Vector3();
+      cameraControlRef.current.getPosition(currentPos);
+
+      const visualYOffset = 0.55;
+
+      await cameraControlRef.current.setLookAt(
+        currentPos.x,
+        currentPos.y + visualYOffset,
+        currentPos.z,
+        currentTarget.x,
+        currentTarget.y + visualYOffset,
+        currentTarget.z,
+        true
+      );
     }, [geometry]);
 
     const handleModelReady = React.useCallback(() => {
