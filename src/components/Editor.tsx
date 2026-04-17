@@ -4,6 +4,7 @@ import RedoRoundedIcon from '@mui/icons-material/RedoRounded';
 import ThreeDRotationRoundedIcon from '@mui/icons-material/ThreeDRotationRounded';
 import UndoRoundedIcon from '@mui/icons-material/UndoRounded';
 import VideocamRoundedIcon from '@mui/icons-material/VideocamRounded';
+import WarningAmberRoundedIcon from '@mui/icons-material/WarningAmberRounded';
 import ZoomInRoundedIcon from '@mui/icons-material/ZoomInRounded';
 import ZoomOutRoundedIcon from '@mui/icons-material/ZoomOutRounded';
 import Box from '@mui/material/Box';
@@ -190,7 +191,7 @@ export default function Editor({ examplePath, onSettingsChange }: Props) {
     });
   const [isPreparingExport, setIsPreparingExport] = React.useState(false);
   const [isSceneReady, setIsSceneReady] = React.useState(false);
-  const [, setSceneRevision] = React.useState(0);
+  const [sceneRevision, setSceneRevision] = React.useState(0);
   const forceCanvasRender = React.useCallback(() => {
     setSceneRevision((prev) => prev + 1);
   }, []);
@@ -277,6 +278,36 @@ export default function Editor({ examplePath, onSettingsChange }: Props) {
     () => textCanvas?.toDataURL() || null,
     [textCanvas]
   );
+
+  const hasAddons = !!selectedAddonId && selectedAddonId !== 'base';
+
+  const capColorCount = React.useMemo(() => {
+    if (!object || !primaryCapMeshSet) return 0;
+    const uniqueColors = new Set<string>();
+    object.traverse((child) => {
+      if ((child as THREE.Mesh).isMesh) {
+        const mesh = child as THREE.Mesh;
+        
+        // Use the sophisticated primary mesh detection for high accuracy
+        if (!primaryCapMeshSet.has(mesh.uuid)) return;
+
+        if (mesh.geometry && mesh.geometry.attributes.color) {
+          const colorArray = mesh.geometry.attributes.color.array as Float32Array;
+          if (colorArray && colorArray.length >= 3) {
+            const threeColor = new THREE.Color(
+              colorArray[0],
+              colorArray[1],
+              colorArray[2]
+            );
+            uniqueColors.add(`#${threeColor.getHexString()}`.toUpperCase());
+          }
+        }
+      }
+    });
+    return uniqueColors.size;
+  }, [object, sceneRevision, primaryCapMeshSet]);
+
+  const isColorLimitExceeded = hasAddons && capColorCount > 3;
 
   useEffect(() => {
     const nextSettings = {
@@ -512,6 +543,18 @@ export default function Editor({ examplePath, onSettingsChange }: Props) {
       return;
     }
 
+    // Validation: Limit to 3 colors if addons are active
+    if (hasAddons && capColorCount > 3) {
+      enqueueSnackbar(
+        `Selection exceeds color limit: Please use a maximum of 3 colors for the cap base to preserve ${capFamilyLabel} accessory fidelity.`,
+        {
+          variant: 'warning',
+          autoHideDuration: 6000,
+        }
+      );
+      return;
+    }
+
     let shouldResetPreparingExport = true;
 
     setIsPreparingExport(true);
@@ -543,7 +586,17 @@ export default function Editor({ examplePath, onSettingsChange }: Props) {
         setIsPreparingExport(false);
       }
     }
-  }, [file, isEditorBusy, object, router, setReviewData]);
+  }, [
+    file,
+    isEditorBusy,
+    object,
+    router,
+    setReviewData,
+    hasAddons,
+    capColorCount,
+    isColorLimitExceeded,
+    capFamilyLabel,
+  ]);
 
   const handleMeshColorChange = (uuid, color: string) => {
     object?.traverse((child) => {
@@ -1072,28 +1125,45 @@ export default function Editor({ examplePath, onSettingsChange }: Props) {
   ] as const;
 
   const exportAction = (
-    <Button
-      disabled={!object || isEditorBusy}
-      onClick={handleExport}
-      sx={{
-        px: { xs: 2.75, md: 3.5 },
-        py: 1.35,
-        borderRadius: '999px',
-        background: 'linear-gradient(145deg, #0058bc 0%, #0f6fe3 100%)',
-        color: '#ffffff',
-        fontFamily: '"Manrope", "Inter", sans-serif',
-        fontSize: { xs: 14, md: 15 },
-        fontWeight: 800,
-        letterSpacing: '-0.02em',
-        textTransform: 'none',
-        boxShadow: '0 16px 28px rgba(0, 88, 188, 0.22)',
-        '&:hover': {
-          background: 'linear-gradient(145deg, #004da6 0%, #0c67d6 100%)',
-        },
-      }}
+    <Tooltip
+      title={isColorLimitExceeded ? `Compatibility limit reached: Use a maximum of 3 colors for the cap base to preserve ${capFamilyLabel} accessory fidelity.` : ""}
+      placement="bottom"
+      arrow
     >
-      Export .3MF
-    </Button>
+      <span>
+        <Button
+          disabled={!object || isEditorBusy || isColorLimitExceeded}
+          onClick={handleExport}
+          sx={{
+            px: { xs: 2.75, md: 3.5 },
+            py: 1.35,
+            borderRadius: '999px',
+            background: isColorLimitExceeded 
+              ? alpha('#ef4444', 0.12)
+              : 'linear-gradient(145deg, #0058bc 0%, #0f6fe3 100%)',
+            color: isColorLimitExceeded ? '#ef4444' : '#ffffff',
+            border: isColorLimitExceeded ? `1.5px dashed ${alpha('#ef4444', 0.4)}` : 'none',
+            fontFamily: '"Manrope", "Inter", sans-serif',
+            fontSize: { xs: 14, md: 15 },
+            fontWeight: 800,
+            letterSpacing: '-0.02em',
+            textTransform: 'none',
+            boxShadow: isColorLimitExceeded ? 'none' : '0 16px 28px rgba(0, 88, 188, 0.22)',
+            '&:hover': {
+              background: isColorLimitExceeded 
+                ? alpha('#ef4444', 0.18)
+                : 'linear-gradient(145deg, #004da6 0%, #0c67d6 100%)',
+            },
+            '&.Mui-disabled': {
+              bgcolor: isColorLimitExceeded ? alpha('#ef4444', 0.08) : undefined,
+              color: isColorLimitExceeded ? alpha('#ef4444', 0.45) : undefined,
+            }
+          }}
+        >
+          {isColorLimitExceeded ? 'Color Limit Error' : 'Export .3MF'}
+        </Button>
+      </span>
+    </Tooltip>
   );
 
   if (!file) {
@@ -1267,6 +1337,78 @@ export default function Editor({ examplePath, onSettingsChange }: Props) {
               )}
             </Box>
 
+            {isColorLimitExceeded && (
+              <Box
+                sx={{
+                  position: 'absolute',
+                  inset: 0,
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  justifyContent: 'center',
+                  zIndex: 5,
+                  pointerEvents: 'none',
+                  pt: { xs: 2.5, md: 4 }, // Posición en el borde superior
+                  bgcolor: alpha('#000000', 0.02),
+                }}
+              >
+                <Box
+                  sx={{
+                    px: 3,
+                    py: 1.75,
+                    borderRadius: '20px',
+                    bgcolor: alpha('#ffffff', 0.96),
+                    backdropFilter: 'blur(12px)',
+                    border: '1.2px solid #ef4444',
+                    boxShadow: '0 12px 32px rgba(239, 68, 68, 0.12)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 2,
+                    maxWidth: 560,
+                    pointerEvents: 'auto',
+                  }}
+                >
+                  <Box
+                    sx={{
+                      width: 40,
+                      height: 40,
+                      borderRadius: '12px',
+                      bgcolor: '#fee2e2',
+                      color: '#ef4444',
+                      display: 'grid',
+                      placeItems: 'center',
+                      flexShrink: 0,
+                    }}
+                  >
+                    <WarningAmberRoundedIcon sx={{ fontSize: 24 }} />
+                  </Box>
+                  <Box>
+                    <Typography
+                      sx={{
+                        fontSize: 15,
+                        fontWeight: 800,
+                        color: '#991b1b',
+                        fontFamily: '"Manrope", "Inter", sans-serif',
+                        lineHeight: 1.1,
+                        mb: 0.25,
+                      }}
+                    >
+                      Bambu Studio Color Limit
+                    </Typography>
+                    <Typography
+                      sx={{
+                        fontSize: 13,
+                        color: '#b91c1c',
+                        lineHeight: 1.4,
+                        fontWeight: 500,
+                      }}
+                    >
+                      Use a maximum of 3 colors for this cap with accessories to avoid slicer coloring errors.
+                    </Typography>
+                  </Box>
+                </Box>
+              </Box>
+            )}
+
             <Stack
               direction="row"
               spacing={1}
@@ -1381,6 +1523,8 @@ export default function Editor({ examplePath, onSettingsChange }: Props) {
             imageMirrored={imageMirrored}
             imageRotation={imageRotation}
             imageSize={imageSize}
+            isColorLimitExceeded={isColorLimitExceeded}
+            capColorCount={capColorCount}
             onAddonSelect={handleAddonSelect}
             onApplyTruckerPreset={handleApplyTruckerPreset}
             onColorChange={handleWorkingColorChange}

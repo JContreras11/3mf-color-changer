@@ -45,6 +45,8 @@ type Props = {
   onImageSizeChange: (value: number) => void;
   onLibraryGraphicSelect: (item: GraphicLibraryItem) => void;
   onTextChange: (value: string) => void;
+  isColorLimitExceeded?: boolean;
+  capColorCount?: number;
   onTextMirrorChange: (value: boolean) => void;
   onTextRotationChange: (value: number) => void;
   onTextSizeChange: (value: number) => void;
@@ -116,6 +118,8 @@ const OverlayBrushPanel = React.memo(function OverlayBrushPanel({
   onImageSizeChange,
   onLibraryGraphicSelect,
   onTextChange,
+  isColorLimitExceeded = false,
+  capColorCount = 0,
   onTextMirrorChange,
   onTextRotationChange,
   onTextSizeChange,
@@ -449,6 +453,60 @@ const OverlayBrushPanel = React.memo(function OverlayBrushPanel({
               title="Direct painting"
               description="Whole Cap painting is always active here, so every click paints the selected solid with the current atelier color."
             />
+
+            <Box
+              sx={{
+                p: 2.25,
+                borderRadius: '24px',
+                bgcolor: isColorLimitExceeded ? alpha('#fee2e2', 0.6) : alpha('#f0fdf4', 0.6),
+                border: `1px solid ${isColorLimitExceeded ? alpha('#ef4444', 0.28) : alpha('#22c55e', 0.28)}`,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 2,
+              }}
+            >
+              <Box
+                sx={{
+                  width: 44,
+                  height: 44,
+                  borderRadius: '14px',
+                  display: 'grid',
+                  placeItems: 'center',
+                  bgcolor: isColorLimitExceeded ? '#ef4444' : '#22c55e',
+                  color: '#fff',
+                  flexShrink: 0,
+                  boxShadow: `0 8px 16px ${isColorLimitExceeded ? 'rgba(239, 68, 68, 0.22)' : 'rgba(34, 197, 94, 0.22)'}`,
+                }}
+              >
+                <Typography sx={{ fontWeight: 800, fontSize: 18 }}>
+                  {capColorCount}
+                </Typography>
+              </Box>
+              <Box>
+                <Typography
+                  sx={{
+                    fontSize: 14,
+                    fontWeight: 700,
+                    color: isColorLimitExceeded ? '#991b1b' : '#166534',
+                    lineHeight: 1.2,
+                  }}
+                >
+                  {isColorLimitExceeded ? 'Addon compatibility risk' : 'Color palette usage'}
+                </Typography>
+                <Typography
+                  sx={{
+                    mt: 0.5,
+                    fontSize: 12.5,
+                    color: isColorLimitExceeded ? '#b91c1c' : '#15803d',
+                    lineHeight: 1.4,
+                  }}
+                >
+                  {isColorLimitExceeded
+                    ? 'Limit to 3 colors to preserve accessory fidelity in Bambu Studio.'
+                    : 'Your current selection is optimized for 3MF accessory printing.'}
+                </Typography>
+              </Box>
+            </Box>
           </Stack>
         )}
 
