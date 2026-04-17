@@ -1160,7 +1160,7 @@ export default function Editor({ examplePath, onSettingsChange }: Props) {
             }
           }}
         >
-          {isColorLimitExceeded ? 'Color Limit Error' : 'Export .3MF'}
+          {isColorLimitExceeded ? 'Color Limit' : 'Export .3MF'}
         </Button>
       </span>
     </Tooltip>

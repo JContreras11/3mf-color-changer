@@ -68,7 +68,7 @@ export default function NativeExportModal({
       open={open}
       onClose={isDownloading ? undefined : onClose}
       fullWidth
-      maxWidth="lg"
+      maxWidth="sm"
       slotProps={{
         paper: {
           sx: {
@@ -81,79 +81,12 @@ export default function NativeExportModal({
         },
       }}
     >
-      <Stack
-        direction={{ xs: 'column', md: 'row' }}
-        sx={{ minHeight: { md: 560 } }}
-      >
-        {/* ── Left panel: Visual preview ─────────────────────────────── */}
+      <Stack direction="column">
         <Box
           sx={{
-            position: 'relative',
-            width: { xs: '100%', md: '50%' },
-            minHeight: { xs: 280, sm: 340, md: 'auto' },
-            p: { xs: 2.5, md: 2.75 },
-            background:
-              'radial-gradient(circle at top left, rgba(15,111,227,0.18) 0%, rgba(255,255,255,0.94) 46%, rgba(237,244,255,0.94) 100%)',
-            borderRight: {
-              md: `1px solid ${alpha('#d9e4fb', 0.92)}`,
-            },
-            borderBottom: {
-              xs: `1px solid ${alpha('#d9e4fb', 0.92)}`,
-              md: 'none',
-            },
-          }}
-        >
-          <Box
-            sx={{
-              display: 'inline-flex',
-              px: 1.5,
-              py: 0.8,
-              borderRadius: '999px',
-              bgcolor: alpha('#ffffff', 0.84),
-              color: '#0058bc',
-              fontSize: 12,
-              fontWeight: 800,
-              letterSpacing: '0.2em',
-              textTransform: 'uppercase',
-              boxShadow: '0 12px 28px rgba(0, 88, 188, 0.12)',
-            }}
-          >
-            Setup help
-          </Box>
-
-          <Box
-            sx={{
-              mt: 1.6,
-              borderRadius: '24px',
-              overflow: 'hidden',
-              border: `1px solid ${alpha('#d8e2ff', 0.92)}`,
-              boxShadow: '0 22px 50px rgba(15, 23, 42, 0.1)',
-              bgcolor: '#ffffff',
-            }}
-          >
-            <Box
-              component="img"
-              src="/help.gif"
-              alt="Bambu Studio setup recommendations preview"
-              sx={{
-                display: 'block',
-                width: '100%',
-                height: '100%',
-                minHeight: { xs: 220, md: 540 },
-                objectFit: 'cover',
-              }}
-            />
-          </Box>
-        </Box>
-
-        {/* ── Right panel: Project name + disclaimer ─────────────────── */}
-        <Box
-          sx={{
-            width: { xs: '100%', md: '50%' },
-            p: { xs: 2.5, md: 3 },
+            p: { xs: 3, md: 4 },
             display: 'flex',
             flexDirection: 'column',
-            justifyContent: 'space-between',
             gap: 2,
           }}
         >
@@ -217,10 +150,10 @@ export default function NativeExportModal({
               sx={{
                 mt: 2.5,
                 '& .MuiOutlinedInput-root': {
-                  borderRadius: '18px',
-                  minHeight: 68,
+                  borderRadius: '10px',
+                  minHeight: 40,
                   fontFamily: '"Manrope", "Inter", sans-serif',
-                  fontSize: 16,
+                  fontSize: 15,
                   fontWeight: 600,
                   '& fieldset': {
                     borderColor: alpha('#b8c5e3', 0.7),
@@ -233,9 +166,6 @@ export default function NativeExportModal({
                     borderColor: '#0058bc',
                     borderWidth: 2,
                   },
-                },
-                '& .MuiInputBase-input': {
-                   paddingY: 2.2,
                 },
                 '& .MuiInputLabel-root': {
                   fontFamily: '"Manrope", "Inter", sans-serif',
