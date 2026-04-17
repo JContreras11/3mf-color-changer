@@ -56,8 +56,9 @@ export default function ExportReview() {
       // [TEMPORAL] bridge cleanup
       setIsNativeModalOpen(false);
       setIsNativeDownloading(false);
+      router.push('/');
     }
-  }, [reviewData]);
+  }, [reviewData, router]);
 
   const handleOpenDownloadModal = React.useCallback(() => {
     if (!reviewData) {
@@ -148,9 +149,7 @@ export default function ExportReview() {
           onDownload={handleOpenDownloadModal}
           onRestart={handleRestart}
         />
-      ) : (
-        <EmptyReviewState onRestart={handleRestart} />
-      )}
+      ) : null}
       <DownloadDisclaimerModal
         accepted={hasAcceptedDisclaimer}
         open={isDownloadModalOpen}
@@ -190,36 +189,6 @@ function ReviewLayout({
     setHasMounted(true);
   }, []);
 
-  const metricItems = [
-    {
-      icon: <Inventory2RoundedIcon sx={{ fontSize: 24 }} />,
-      label: 'Base model',
-      value: reviewData.baseModelLabel,
-      meta: reviewData.variantLabel || reviewData.sourceKindLabel,
-    },
-    {
-      icon: <DescriptionRoundedIcon sx={{ fontSize: 24 }} />,
-      label: 'Source file',
-      value: reviewData.sourceFileName,
-      meta: reviewData.downloadName,
-    },
-    {
-      icon: <AutoAwesomeRoundedIcon sx={{ fontSize: 24 }} />,
-      label: 'Applied edits',
-      value:
-        reviewData.overlayCount > 0
-          ? `${reviewData.overlayCount} projected overlay${reviewData.overlayCount === 1 ? '' : 's'}`
-          : 'Material-only customization',
-      meta: `${formatNumber(reviewData.meshCount)} printable mesh${reviewData.meshCount === 1 ? '' : 'es'}`,
-    },
-    {
-      icon: <CategoryRoundedIcon sx={{ fontSize: 24 }} />,
-      label: 'Geometry',
-      value: `${formatNumber(reviewData.triangleCount)} triangles`,
-      meta: `${formatBytes(reviewData.blob.size)} export package`,
-    },
-  ] as const;
-
   return (
     <Box
       component="section"
@@ -242,35 +211,13 @@ function ReviewLayout({
           minHeight: { xs: 460, lg: 0 },
           overflow: 'hidden',
           borderRadius: { xs: '32px', md: '40px' },
-          border: `1px solid ${alpha('#1e293b', 0.7)}`,
+          border: 'none',
           boxShadow: '0 30px 90px rgba(0, 0, 0, 0.35)',
-          background: '#5a5a5a',
+          background: '#bdbdbd',
         }}
         aria-busy={!isPreviewReady}
       >
-        <Box
-          sx={{
-            position: 'absolute',
-            top: 24,
-            right: 24,
-            zIndex: 2,
-            px: 2,
-            py: 1,
-            borderRadius: '999px',
-            bgcolor: alpha('#0f1629', 0.78),
-            backdropFilter: 'blur(12px)',
-            color: alpha('#94a3b8', 0.92),
-            fontSize: 12,
-            fontWeight: 800,
-            letterSpacing: '0.22em',
-            textTransform: 'uppercase',
-            boxShadow: '0 12px 24px rgba(0, 0, 0, 0.28)',
-            border: `1px solid ${alpha('#334155', 0.5)}`,
-          }}
-        >
-          {/* Label de la vista 3D generada interactivamente */}
-          3MF Preview
-        </Box>
+        {/* Eliminado: 3MF Preview Badge */}
 
         <Box
           sx={{
@@ -297,8 +244,8 @@ function ReviewLayout({
               display: 'grid',
               placeItems: 'center',
               px: 3,
-              background: alpha('#f3f4f6', 0.6),
-              backdropFilter: 'blur(12px)',
+              background: alpha('#f8fafc', 0.4),
+              backdropFilter: 'blur(18px)',
             }}
           >
             <Stack
@@ -308,9 +255,9 @@ function ReviewLayout({
                 width: 'min(100%, 360px)',
                 p: { xs: 2.5, md: 3 },
                 borderRadius: '28px',
-                bgcolor: alpha('#ffffff', 0.94),
-                border: '1px solid rgba(0, 0, 0, 0.08)',
-                boxShadow: '0 24px 60px rgba(0, 0, 0, 0.12)',
+                bgcolor: alpha('#ffffff', 0.75),
+                border: 'none',
+                boxShadow: '0 32px 80px rgba(0, 0, 0, 0.14)',
                 textAlign: 'center',
               }}
             >
@@ -343,48 +290,7 @@ function ReviewLayout({
           </Box>
         )}
 
-        <Stack
-          direction={{ xs: 'column', sm: 'row' }}
-          spacing={1}
-          sx={{
-            position: 'absolute',
-            left: { xs: 18, md: 24 },
-            right: { xs: 18, md: 24 },
-            bottom: { xs: 18, md: 24 },
-            zIndex: 2,
-          }}
-        >
-          {[
-            `${formatBytes(reviewData.blob.size)} ready package`,
-            `${formatNumber(reviewData.triangleCount)} triangles`,
-            `${formatNumber(reviewData.meshCount)} printable meshes`,
-          ].map((label) => (
-            <Box
-              key={label}
-              sx={{
-                px: 2,
-                py: 1.1,
-                borderRadius: '999px',
-                bgcolor: alpha('#0f1629', 0.72),
-                backdropFilter: 'blur(18px)',
-                border: `1px solid ${alpha('#334155', 0.5)}`,
-                boxShadow: '0 16px 30px rgba(0, 0, 0, 0.28)',
-              }}
-            >
-              <Typography
-                sx={{
-                  color: alpha('#94a3b8', 0.88),
-                  fontSize: 12,
-                  fontWeight: 700,
-                  letterSpacing: '0.14em',
-                  textTransform: 'uppercase',
-                }}
-              >
-                {label}
-              </Typography>
-            </Box>
-          ))}
-        </Stack>
+        {/* Eliminado: Bloque de métricas técnicas (pills inferiores) */}
       </Box>
 
       <Box
@@ -436,37 +342,7 @@ function ReviewLayout({
           when you are ready.
         </Typography>
 
-        <Stack spacing={1.6} sx={{ mt: 3.5 }}>
-          {metricItems.map((item) => (
-            <SummaryItem
-              key={item.label}
-              icon={item.icon}
-              label={item.label}
-              meta={item.meta}
-              value={item.value}
-            />
-          ))}
-        </Stack>
-
-        <Divider sx={{ my: 3, borderColor: alpha('#cdd5e7', 0.8) }} />
-
-        <Stack spacing={1.2} sx={{ mb: 3 }}>
-          <DetailRow
-            label="Generated"
-            value={hasMounted ? formatDate(reviewData.generatedAt) : '—'}
-          />
-          <DetailRow label="Output file" value={reviewData.downloadName} />
-          <DetailRow
-            label="Projected overlays"
-            value={String(reviewData.overlayCount)}
-          />
-          <DetailRow
-            label="Preview geometry"
-            value={formatNumber(reviewData.meshCount)}
-          />
-        </Stack>
-
-        <Stack spacing={1.5}>
+        <Stack spacing={1.5} sx={{ mt: 3 }}>
           <Button
             onClick={onDownload}
             startIcon={<DownloadRoundedIcon />}
@@ -483,31 +359,6 @@ function ReviewLayout({
           </Button>
         </Stack>
 
-        <Chip
-          icon={<CheckCircleRoundedIcon />}
-          label="Geometry verified for multi-material printing"
-          sx={{
-            mt: 3,
-            width: '100%',
-            justifyContent: 'flex-start',
-            minHeight: 56,
-            borderRadius: '20px',
-            bgcolor: alpha('#f3f7f3', 0.95),
-            color: '#1f5131',
-            border: `1px solid ${alpha('#c8e5d0', 0.9)}`,
-            fontSize: 14,
-            fontWeight: 700,
-            letterSpacing: '0.01em',
-            '& .MuiChip-icon': {
-              color: '#13a247',
-            },
-            '& .MuiChip-label': {
-              display: 'block',
-              whiteSpace: 'normal',
-              paddingY: 1.25,
-            },
-          }}
-        />
       </Box>
     </Box>
   );
@@ -811,98 +662,6 @@ function DownloadDisclaimerModal({
   );
 }
 
-function SummaryItem({
-  icon,
-  label,
-  meta,
-  value,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  meta: string;
-  value: string;
-}) {
-  return (
-    <Stack direction="row" spacing={1.5} alignItems="center">
-      <Box
-        sx={{
-          flexShrink: 0,
-          width: 52,
-          height: 52,
-          borderRadius: '18px',
-          display: 'grid',
-          placeItems: 'center',
-          bgcolor: alpha('#0058bc', 0.08),
-          color: '#0058bc',
-        }}
-      >
-        {icon}
-      </Box>
-      <Box sx={{ minWidth: 0 }}>
-        <Typography
-          sx={{
-            color: '#7d8697',
-            fontSize: 12,
-            fontWeight: 700,
-            letterSpacing: '0.18em',
-            textTransform: 'uppercase',
-          }}
-        >
-          {label}
-        </Typography>
-        <Typography
-          sx={{
-            color: '#111827',
-            fontSize: { xs: 18, md: 21 },
-            fontWeight: 700,
-            lineHeight: 1.25,
-            wordBreak: 'break-word',
-          }}
-        >
-          {value}
-        </Typography>
-        <Typography
-          sx={{
-            color: '#4b5563',
-            fontSize: 14,
-            lineHeight: 1.5,
-            wordBreak: 'break-word',
-          }}
-        >
-          {meta}
-        </Typography>
-      </Box>
-    </Stack>
-  );
-}
-
-function DetailRow({ label, value }: { label: string; value: string }) {
-  return (
-    <Stack direction="row" spacing={2} justifyContent="space-between">
-      <Typography
-        sx={{
-          color: '#7d8697',
-          fontSize: 14,
-          fontWeight: 600,
-        }}
-      >
-        {label}
-      </Typography>
-      <Typography
-        sx={{
-          color: '#111827',
-          fontSize: 14,
-          fontWeight: 700,
-          textAlign: 'right',
-          wordBreak: 'break-word',
-        }}
-      >
-        {value}
-      </Typography>
-    </Stack>
-  );
-}
-
 const headerActionSx = {
   px: { xs: 2.75, md: 3.5 },
   py: 1.35,
@@ -970,28 +729,4 @@ const modalSecondaryButtonSx = {
   px: 3,
 };
 
-function formatBytes(size: number) {
-  if (size === 0) {
-    return '0 B';
-  }
 
-  const units = ['B', 'KB', 'MB', 'GB'];
-  const exponent = Math.min(
-    Math.floor(Math.log(size) / Math.log(1024)),
-    units.length - 1
-  );
-  const value = size / 1024 ** exponent;
-
-  return `${value >= 10 || exponent === 0 ? value.toFixed(0) : value.toFixed(1)} ${units[exponent]}`;
-}
-
-function formatDate(timestamp: number) {
-  return new Intl.DateTimeFormat('en-US', {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-  }).format(timestamp);
-}
-
-function formatNumber(value: number) {
-  return new Intl.NumberFormat('en-US').format(Math.round(value));
-}

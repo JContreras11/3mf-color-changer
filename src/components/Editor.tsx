@@ -1233,33 +1233,12 @@ export default function Editor({ examplePath, onSettingsChange }: Props) {
               height: '100%',
               overflow: 'hidden',
               borderRadius: { xs: '32px', md: '40px' },
-              border: `1px solid ${alpha('#243040', 0.9)}`,
+              border: 'none',
               boxShadow: '0 36px 110px rgba(2, 6, 23, 0.34)',
-              background: '#5a5a5a',
+              background: '#bdbdbd',
             }}
           >
-            <Box
-              sx={{
-                position: 'absolute',
-                top: 24,
-                right: 24,
-                zIndex: 2,
-                px: 2,
-                py: 1,
-                borderRadius: '999px',
-                bgcolor: alpha('#04070d', 0.72),
-                color: alpha('#e5edf8', 0.9),
-                fontSize: 12,
-                fontWeight: 800,
-                letterSpacing: '0.22em',
-                textTransform: 'uppercase',
-                border: `1px solid ${alpha('#8ea4c8', 0.2)}`,
-                boxShadow: '0 18px 36px rgba(2, 6, 23, 0.22)',
-                backdropFilter: 'blur(14px)',
-              }}
-            >
-              Direct 3MF Preview
-            </Box>
+            {/* Eliminado: Direct 3MF Preview Badge */}
 
             <Box
               ref={editorRef}
@@ -1340,8 +1319,8 @@ export default function Editor({ examplePath, onSettingsChange }: Props) {
                 pointerEvents: 'none',
                 transition: 'opacity 180ms ease',
                 zIndex: isEditorBusy ? 5 : -1,
-                background: alpha('#f3f4f6', 0.6),
-                backdropFilter: isEditorBusy ? 'blur(12px)' : 'blur(0px)',
+                background: alpha('#f8fafc', 0.4),
+                backdropFilter: isEditorBusy ? 'blur(18px)' : 'blur(0px)',
               }}
             >
               <Stack
@@ -1352,9 +1331,9 @@ export default function Editor({ examplePath, onSettingsChange }: Props) {
                   px: { xs: 3, md: 4 },
                   py: { xs: 3, md: 3.5 },
                   borderRadius: '28px',
-                  bgcolor: alpha('#ffffff', 0.94),
-                  boxShadow: '0 32px 96px rgba(0, 0, 0, 0.12)',
-                  border: '1px solid rgba(0, 0, 0, 0.08)',
+                  bgcolor: alpha('#ffffff', 0.72),
+                  boxShadow: '0 40px 100px rgba(0, 0, 0, 0.16)',
+                  border: 'none',
                   textAlign: 'center',
                 }}
               >

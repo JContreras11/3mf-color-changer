@@ -13,11 +13,11 @@ export const Environment = memo(function Environment({
   /* eslint-disable react/no-unknown-property */
   return (
     <>
-      <color attach="background" args={['#5a5a5a']} />
-      <fog attach="fog" args={['#5a5a5a', 11, 32]} />
+      <color attach="background" args={['#bdbdbd']} />
+      <fog attach="fog" args={['#bdbdbd', 11, 32]} />
       <hemisphereLight
         color="#ffffff"
-        groundColor="#5a5a5a"
+        groundColor="#bdbdbd"
         intensity={0.65}
       />
       <ambientLight intensity={0.38} />

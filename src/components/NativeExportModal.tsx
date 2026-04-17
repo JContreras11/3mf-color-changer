@@ -6,10 +6,11 @@
 
 import CheckCircleRoundedIcon from '@mui/icons-material/CheckCircleRounded';
 import DownloadRoundedIcon from '@mui/icons-material/DownloadRounded';
-import InventoryRoundedIcon from '@mui/icons-material/Inventory2Rounded';
+import CapstoneIcon from '@mui/icons-material/SportsBaseballRounded';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Checkbox from '@mui/material/Checkbox';
+import FormControlLabel from '@mui/material/FormControlLabel';
 import CircularProgress from '@mui/material/CircularProgress';
 import Dialog from '@mui/material/Dialog';
 import Stack from '@mui/material/Stack';
@@ -173,8 +174,8 @@ export default function NativeExportModal({
                 textTransform: 'uppercase',
               }}
             >
-              <InventoryRoundedIcon sx={{ fontSize: 14 }} />
-              Native .3MF
+              <CapstoneIcon sx={{ fontSize: 16 }} />
+              Make your caps
             </Box>
 
             <Typography
@@ -216,7 +217,8 @@ export default function NativeExportModal({
               sx={{
                 mt: 2.5,
                 '& .MuiOutlinedInput-root': {
-                  borderRadius: '16px',
+                  borderRadius: '18px',
+                  minHeight: 68,
                   fontFamily: '"Manrope", "Inter", sans-serif',
                   fontSize: 16,
                   fontWeight: 600,
@@ -232,6 +234,9 @@ export default function NativeExportModal({
                     borderWidth: 2,
                   },
                 },
+                '& .MuiInputBase-input': {
+                   paddingY: 2.2,
+                },
                 '& .MuiInputLabel-root': {
                   fontFamily: '"Manrope", "Inter", sans-serif',
                   fontWeight: 700,
@@ -241,84 +246,46 @@ export default function NativeExportModal({
             />
 
             <Stack spacing={1.5} sx={{ mt: 2 }}>
-              <Box
-                sx={{
-                  display: 'flex',
-                  gap: 1,
-                  p: 1.5,
-                  borderRadius: '14px',
-                  bgcolor: alpha('#f3f7f3', 0.95),
-                  border: `1px solid ${alpha('#c8e5d0', 0.9)}`,
-                }}
-              >
-                <CheckCircleRoundedIcon
-                  sx={{ fontSize: 18, color: '#13a247', mt: 0.2 }}
-                />
-                <Box>
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    size="small"
+                    checked={hasAcceptedDisclaimer}
+                    onChange={(event) =>
+                      setHasAcceptedDisclaimer(event.target.checked)
+                    }
+                    disabled={isDownloading}
+                    sx={{
+                      p: 0.5,
+                      mr: 0.5,
+                      color: alpha('#0058bc', 0.54),
+                      '&.Mui-checked': {
+                        color: '#0058bc',
+                      },
+                    }}
+                  />
+                }
+                label={
                   <Typography
                     sx={{
-                      fontSize: 13,
-                      fontWeight: 700,
-                      color: '#1f5131',
-                      lineHeight: 1.4,
+                      fontSize: 14,
+                      lineHeight: 1.6,
+                      color: '#334155',
+                      userSelect: 'none',
                     }}
                   >
-                    Slicer-ready package
+                    By using MakeYourCaps, you acknowledge that the generated
+                    digital files (such as 3MF) are intended for personal use
+                    only and must not be shared, redistributed, or sold in any
+                    form.
                   </Typography>
-                  <Typography
-                    sx={{
-                      fontSize: 12,
-                      color: '#3b6b4a',
-                      lineHeight: 1.55,
-                      mt: 0.2,
-                    }}
-                  >
-                    Tree supports · Plate positioning · Filament mapping —
-                    all kept intact.
-                  </Typography>
-                </Box>
-              </Box>
-
-              <Box
+                }
                 sx={{
-                  display: 'flex',
                   alignItems: 'flex-start',
-                  gap: 1.2,
+                  ml: -0.5,
+                  mr: 0,
                 }}
-              >
-                <Checkbox
-                  size="small"
-                  checked={hasAcceptedDisclaimer}
-                  onChange={(event) =>
-                    setHasAcceptedDisclaimer(event.target.checked)
-                  }
-                  disabled={isDownloading}
-                  inputProps={{
-                    'aria-label':
-                      'Acknowledge personal-use-only export terms',
-                  }}
-                  sx={{
-                    mt: 0.15,
-                    p: 0.25,
-                    color: alpha('#0058bc', 0.54),
-                    '&.Mui-checked': {
-                      color: '#0058bc',
-                    },
-                  }}
-                />
-                <Typography
-                  sx={{
-                    fontSize: 14,
-                    lineHeight: 1.6,
-                    color: '#334155',
-                  }}
-                >
-                  By using MakeYourCaps, you acknowledge that the generated
-                  digital files (such as 3MF) are intended for personal use
-                  only and must not be shared, redistributed, or sold in any
-                  form.
-                </Typography>
-              </Box>
+              />
             </Stack>
           </Box>
 
