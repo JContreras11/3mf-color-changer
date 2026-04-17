@@ -5,7 +5,7 @@
   "description": "Web Tool for changing the color of objects in 3mf files",
   "author": "",
   "scripts": {
-    "dev": "next dev --turbopack",
+    "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "lint": "eslint . --ext .js,.jsx,.ts,.tsx",
