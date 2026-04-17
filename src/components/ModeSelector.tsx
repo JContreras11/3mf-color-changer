@@ -39,12 +39,14 @@ const panelItems = [
     label: 'Addons',
     icon: ExtensionRoundedIcon,
     tooltip: 'Swap into curated 3MF accessory variations for this silhouette.',
+    comingSoon: false,
   },
   {
     id: 'materials',
     label: 'Materials',
     icon: PaletteOutlinedIcon,
     tooltip: 'Apply quick combos or paint the whole cap with your active color.',
+    comingSoon: false,
   },
   {
     id: 'graphics',
