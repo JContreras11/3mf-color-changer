@@ -6,19 +6,12 @@ import PermanentDrawer from '@/components/PermanentDrawer';
 import StaticPreviewCanvas from '@/components/threeJs/StaticPreviewCanvas';
 import { downloadExportBlob } from '@/jobs/exportFile';
 import type { ExportReviewData } from '@/utils/exportReview';
-import AutoAwesomeRoundedIcon from '@mui/icons-material/AutoAwesomeRounded';
-import CategoryRoundedIcon from '@mui/icons-material/CategoryRounded';
-import CheckCircleRoundedIcon from '@mui/icons-material/CheckCircleRounded';
-import DescriptionRoundedIcon from '@mui/icons-material/DescriptionRounded';
 import DownloadRoundedIcon from '@mui/icons-material/DownloadRounded';
-import Inventory2RoundedIcon from '@mui/icons-material/Inventory2Rounded';
 import RestartAltRoundedIcon from '@mui/icons-material/RestartAltRounded';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Checkbox from '@mui/material/Checkbox';
-import Chip from '@mui/material/Chip';
 import CircularProgress from '@mui/material/CircularProgress';
-import Divider from '@mui/material/Divider';
 import Dialog from '@mui/material/Dialog';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
@@ -30,7 +23,6 @@ import React from 'react';
 // [TEMPORAL] - Modo de Compatibilidad Nativa (Original .3MF)
 // Referencia para reversión: Remove these imports.
 import NativeExportModal from '@/components/NativeExportModal';
-import NativePreviewImage from '@/components/NativePreviewImage';
 import { useDynamicExport } from '@/utils/exportConfig';
 import { downloadOriginal3mf } from '@/utils/nativeExportBridge';
 
@@ -179,15 +171,10 @@ function ReviewLayout({
   onRestart: () => void;
 }) {
   const [isPreviewReady, setIsPreviewReady] = React.useState(false);
-  const [hasMounted, setHasMounted] = React.useState(false);
 
   React.useEffect(() => {
     setIsPreviewReady(false);
   }, [reviewData.previewObject.uuid]);
-
-  React.useEffect(() => {
-    setHasMounted(true);
-  }, []);
 
   return (
     <Box
@@ -359,67 +346,6 @@ function ReviewLayout({
           </Button>
         </Stack>
 
-      </Box>
-    </Box>
-  );
-}
-
-function EmptyReviewState({ onRestart }: { onRestart: () => void }) {
-  return (
-    <Box
-      component="section"
-      sx={{
-        height: '100%',
-        display: 'grid',
-        placeItems: 'center',
-        p: { xs: 2, md: 4 },
-      }}
-    >
-      <Box
-        sx={{
-          width: 'min(560px, 100%)',
-          px: { xs: 3, md: 5 },
-          py: { xs: 4, md: 5 },
-          borderRadius: { xs: '28px', md: '32px' },
-          bgcolor: alpha('#ffffff', 0.94),
-          border: `1px solid ${alpha('#dfe7fb', 0.9)}`,
-          boxShadow: '0 28px 80px rgba(15, 23, 42, 0.08)',
-          textAlign: 'center',
-        }}
-      >
-        <Typography
-          sx={{
-            fontFamily: '"Manrope", "Inter", sans-serif',
-            fontSize: { xs: 30, md: 40 },
-            fontWeight: 800,
-            lineHeight: 0.98,
-            letterSpacing: '-0.05em',
-            color: '#111827',
-          }}
-        >
-          No generated export yet.
-        </Typography>
-        <Typography
-          sx={{
-            mt: 1.75,
-            color: '#4b5563',
-            fontSize: { xs: 15, md: 16 },
-            lineHeight: 1.7,
-          }}
-        >
-          Return to the base step, open a model and generate its final 3MF to
-          unlock this review screen.
-        </Typography>
-        <Button
-          onClick={onRestart}
-          startIcon={<RestartAltRoundedIcon />}
-          sx={{
-            ...panelPrimaryButtonSx,
-            mt: 3,
-          }}
-        >
-          Start a new design
-        </Button>
       </Box>
     </Box>
   );
@@ -664,5 +590,4 @@ const modalSecondaryButtonSx = {
   minHeight: 58,
   px: 3,
 };
-
 

@@ -12,6 +12,10 @@ import getFace from '../threejs/getFace';
 import getFaceColor from '../threejs/getFaceColor';
 import { getFaceCount } from '../threejs/getFaceCount';
 import { addColorGroup } from './addColorGroup';
+import {
+  appendFilamentColorsToProjectConfig,
+  type BambuProjectConfig,
+} from './bambu/filamentSlots';
 
 export type Face = {
   v1: THREE.Vector3;
@@ -72,23 +76,26 @@ export async function changeColors(
           // OVERWRITE strategy: as requested, we map Cap colors exactly into the first N Extruders.
           // Because Addon objects like Samurai masks map to higher Extruder slots natively (e.g. 3, 4, 5) 
           // and we no longer extract their colors (thanks to the .stl filter!), they will naturally be preserved!
-          const existingColors = config.filament_colour || [];
+          const existingColors = Array.isArray(config.filament_colour)
+            ? config.filament_colour
+            : [];
+          const overflowColors: string[] = [];
           
           for (let i = 0; i < uniqueColors.length; i++) {
              if (i < existingColors.length) {
                 existingColors[i] = uniqueColors[i].toUpperCase();
              } else {
-                existingColors.push(uniqueColors[i].toUpperCase());
-                
-                // Duplicate generic properties for any new overflows
-                for (let key in config) {
-                   if (Array.isArray(config[key]) && config[key].length === existingColors.length - 1) {
-                      config[key].push(config[key][0]);
-                   }
-                }
+                overflowColors.push(uniqueColors[i].toUpperCase());
              }
           }
           config.filament_colour = existingColors;
+
+          if (overflowColors.length > 0) {
+            appendFilamentColorsToProjectConfig(
+              config as BambuProjectConfig,
+              overflowColors
+            );
+          }
           
           const patchedConfig = JSON.stringify(config, null, 4);
           await zipWriter.add(entry.filename, new TextReader(patchedConfig));
@@ -133,7 +140,7 @@ export async function changeColors(
           });
           configXml = new XMLSerializer().serializeToString(doc);
           await zipWriter.add(entry.filename, new TextReader(configXml));
-        } catch (e) {
+        } catch {
           await zipWriter.add(entry.filename, new TextReader(configXml));
         }
       }
@@ -176,6 +183,13 @@ export async function changeColors(
         const mesh = child as THREE.Mesh;
 
         if (!mesh.isMesh) {
+          return;
+        }
+
+        if (
+          mesh.userData.isOverlay ||
+          (mesh.name && mesh.name.toLowerCase().includes('.stl'))
+        ) {
           return;
         }
 

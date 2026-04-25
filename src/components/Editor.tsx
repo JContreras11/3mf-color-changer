@@ -32,19 +32,17 @@ import {
   type GraphicLibraryItem,
 } from '../etc/graphicsLibrary';
 import { generateExportFile } from '../jobs/exportFile';
+import { MAX_BAMBU_FILAMENT_SLOTS } from '../utils/3mf/bambu/filamentSlots';
+import { inspectBambu3mf } from '../utils/3mf/bambu/inspectBambu3mf';
+import { normalizeExamplePath } from '../utils/examplePaths';
 import { createExportReviewData } from '../utils/exportReview';
-import {
-  applyTruckerCapPreset,
-  TRUCKER_COLOR_PRESETS,
-  type TruckerColorSections,
-} from '../utils/truckerCapPresets';
 import applyRasterOverlay from '../utils/threejs/applyRasterOverlay';
 import changeMeshColor from '../utils/threejs/changeMeshColor';
 import cloneObjectForHistory from '../utils/threejs/cloneObjectForHistory';
 import createImageCanvas from '../utils/threejs/createImageCanvas';
 import createTextCanvas from '../utils/threejs/createTextCanvas';
-import getPrimaryCapMeshSet from '../utils/threejs/getPrimaryCapMeshSet';
 import getFace from '../utils/threejs/getFace';
+import getPrimaryCapMeshSet from '../utils/threejs/getPrimaryCapMeshSet';
 import mirrorCanvasHorizontally from '../utils/threejs/mirrorCanvasHorizontally';
 import {
   type FilamentImageOptions,
@@ -54,10 +52,14 @@ import {
   getRasterOverlayDimensions,
   getRasterOverlayPlacement,
 } from '../utils/threejs/rasterOverlayPlacement';
-import { normalizeExamplePath } from '../utils/examplePaths';
-import ImagePreparationDialog from './ImagePreparationDialog';
+import {
+  TRUCKER_COLOR_PRESETS,
+  type TruckerColorSections,
+  applyTruckerCapPreset,
+} from '../utils/truckerCapPresets';
 import { useEditorFile } from './EditorFileContext';
 import { useExportReview } from './ExportReviewContext';
+import ImagePreparationDialog from './ImagePreparationDialog';
 import ModeSelector, {
   COMING_SOON_PANELS,
   DesignPanel,
@@ -170,6 +172,8 @@ export default function Editor({ examplePath, onSettingsChange }: Props) {
     React.useState(false);
   const [isApplyingImagePreparation, setIsApplyingImagePreparation] =
     React.useState(false);
+  const [bambuExistingColorCount, setBambuExistingColorCount] =
+    React.useState(0);
   const [imageSize, setImageSize] = React.useState(DEFAULT_IMAGE_SIZE);
   const [imageRotation, setImageRotation] = React.useState(
     DEFAULT_IMAGE_ROTATION
@@ -247,8 +251,7 @@ export default function Editor({ examplePath, onSettingsChange }: Props) {
     () => getPrimaryCapMeshSet(object),
     [object]
   );
-  const editingCapOnly =
-    activePanel === 'graphics' || activePanel === 'text';
+  const editingCapOnly = activePanel === 'graphics' || activePanel === 'text';
   const imageCanvas = React.useMemo(() => {
     if (!sourceImageCanvas) {
       return null;
@@ -280,6 +283,10 @@ export default function Editor({ examplePath, onSettingsChange }: Props) {
   );
 
   const hasAddons = !!selectedAddonId && selectedAddonId !== 'base';
+  const maxImageFilamentColors = React.useMemo(
+    () => Math.max(0, MAX_BAMBU_FILAMENT_SLOTS - bambuExistingColorCount),
+    [bambuExistingColorCount]
+  );
 
   const capColorCount = React.useMemo(() => {
     if (!object || !primaryCapMeshSet) return 0;
@@ -287,12 +294,13 @@ export default function Editor({ examplePath, onSettingsChange }: Props) {
     object.traverse((child) => {
       if ((child as THREE.Mesh).isMesh) {
         const mesh = child as THREE.Mesh;
-        
+
         // Use the sophisticated primary mesh detection for high accuracy
         if (!primaryCapMeshSet.has(mesh.uuid)) return;
 
         if (mesh.geometry && mesh.geometry.attributes.color) {
-          const colorArray = mesh.geometry.attributes.color.array as Float32Array;
+          const colorArray = mesh.geometry.attributes.color
+            .array as Float32Array;
           if (colorArray && colorArray.length >= 3) {
             const threeColor = new THREE.Color(
               colorArray[0],
@@ -328,6 +336,37 @@ export default function Editor({ examplePath, onSettingsChange }: Props) {
     setIsApplyingImagePreparation(false);
     setActivePanel(defaultActivePanel);
   }, [defaultActivePanel, file]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function inspectSourceFileColorBudget() {
+      if (!file) {
+        setBambuExistingColorCount(0);
+        return;
+      }
+
+      try {
+        const sourceBlob =
+          typeof file === 'string' ? await fetchSource3mfBlob(file) : file;
+        const inspection = await inspectBambu3mf(sourceBlob);
+
+        if (!cancelled) {
+          setBambuExistingColorCount(inspection.filamentColors.length);
+        }
+      } catch {
+        if (!cancelled) {
+          setBambuExistingColorCount(0);
+        }
+      }
+    }
+
+    void inspectSourceFileColorBudget();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [file]);
 
   useEffect(() => {
     const nextMode = PANEL_TO_MODE[activePanel];
@@ -384,7 +423,9 @@ export default function Editor({ examplePath, onSettingsChange }: Props) {
 
         if (shouldShow) {
           nextMaterial.opacity = Number(userData.editorOriginalOpacity);
-          nextMaterial.transparent = Boolean(userData.editorOriginalTransparent);
+          nextMaterial.transparent = Boolean(
+            userData.editorOriginalTransparent
+          );
           nextMaterial.depthWrite = Boolean(userData.editorOriginalDepthWrite);
         } else {
           nextMaterial.opacity = 0;
@@ -468,16 +509,22 @@ export default function Editor({ examplePath, onSettingsChange }: Props) {
       // Inyección pre-curada de colores (Opción A aprobada por el usuario).
       // Aplica Classic Americana para romper con el color gris inicial del motor.
       const factoryPreset = TRUCKER_COLOR_PRESETS[0];
-      
+
       applyTruckerCapPreset(object, factoryPreset.sections);
-      
+
       object.userData.factoryColorsApplied = true;
       forceCanvasRender();
-      
+
       // Capturamos esto en el primer frame para que la base del usuario empiece con color
       pushUndoSnapshot(createHistorySnapshot(object));
     }
-  }, [file, forceCanvasRender, object, pushUndoSnapshot, createHistorySnapshot]);
+  }, [
+    file,
+    forceCanvasRender,
+    object,
+    pushUndoSnapshot,
+    createHistorySnapshot,
+  ]);
 
   useEffect(() => {
     resetHistory();
@@ -837,11 +884,15 @@ export default function Editor({ examplePath, onSettingsChange }: Props) {
         const blob = await response.blob();
         const fileName = `${item.id}.${item.type}`;
         const file = new File([blob], fileName, {
-          type: blob.type || (item.type === 'svg' ? 'image/svg+xml' : 'image/png'),
+          type:
+            blob.type || (item.type === 'svg' ? 'image/svg+xml' : 'image/png'),
         });
         const canvas = await createImageCanvas(file);
 
-        openImagePreparation(canvas, `${item.label} (${item.type.toUpperCase()})`);
+        openImagePreparation(
+          canvas,
+          `${item.label} (${item.type.toUpperCase()})`
+        );
       } catch (error) {
         enqueueSnackbar(error.toString(), { variant: 'error' });
       }
@@ -1024,7 +1075,8 @@ export default function Editor({ examplePath, onSettingsChange }: Props) {
       }
 
       router.push(
-        '/editor?example=' + encodeURIComponent(normalizeExamplePath(option.path))
+        '/editor?example=' +
+          encodeURIComponent(normalizeExamplePath(option.path))
       );
     },
     [
@@ -1126,7 +1178,11 @@ export default function Editor({ examplePath, onSettingsChange }: Props) {
 
   const exportAction = (
     <Tooltip
-      title={isColorLimitExceeded ? `Compatibility limit reached: Use a maximum of 3 colors for the cap base to preserve ${capFamilyLabel} accessory fidelity.` : ""}
+      title={
+        isColorLimitExceeded
+          ? `Compatibility limit reached: Use a maximum of 3 colors for the cap base to preserve ${capFamilyLabel} accessory fidelity.`
+          : ''
+      }
       placement="bottom"
       arrow
     >
@@ -1138,26 +1194,32 @@ export default function Editor({ examplePath, onSettingsChange }: Props) {
             px: { xs: 2.75, md: 3.5 },
             py: 1.35,
             borderRadius: '999px',
-            background: isColorLimitExceeded 
+            background: isColorLimitExceeded
               ? alpha('#ef4444', 0.12)
               : 'linear-gradient(145deg, #0058bc 0%, #0f6fe3 100%)',
             color: isColorLimitExceeded ? '#ef4444' : '#ffffff',
-            border: isColorLimitExceeded ? `1.5px dashed ${alpha('#ef4444', 0.4)}` : 'none',
+            border: isColorLimitExceeded
+              ? `1.5px dashed ${alpha('#ef4444', 0.4)}`
+              : 'none',
             fontFamily: '"Manrope", "Inter", sans-serif',
             fontSize: { xs: 14, md: 15 },
             fontWeight: 800,
             letterSpacing: '-0.02em',
             textTransform: 'none',
-            boxShadow: isColorLimitExceeded ? 'none' : '0 16px 28px rgba(0, 88, 188, 0.22)',
+            boxShadow: isColorLimitExceeded
+              ? 'none'
+              : '0 16px 28px rgba(0, 88, 188, 0.22)',
             '&:hover': {
-              background: isColorLimitExceeded 
+              background: isColorLimitExceeded
                 ? alpha('#ef4444', 0.18)
                 : 'linear-gradient(145deg, #004da6 0%, #0c67d6 100%)',
             },
             '&.Mui-disabled': {
-              bgcolor: isColorLimitExceeded ? alpha('#ef4444', 0.08) : undefined,
+              bgcolor: isColorLimitExceeded
+                ? alpha('#ef4444', 0.08)
+                : undefined,
               color: isColorLimitExceeded ? alpha('#ef4444', 0.45) : undefined,
-            }
+            },
           }}
         >
           {isColorLimitExceeded ? 'Color Limit' : 'Export .3MF'}
@@ -1402,7 +1464,8 @@ export default function Editor({ examplePath, onSettingsChange }: Props) {
                         fontWeight: 500,
                       }}
                     >
-                      Use a maximum of 3 colors for this cap with accessories to avoid slicer coloring errors.
+                      Use a maximum of 3 colors for this cap with accessories to
+                      avoid slicer coloring errors.
                     </Typography>
                   </Box>
                 </Box>
@@ -1548,7 +1611,10 @@ export default function Editor({ examplePath, onSettingsChange }: Props) {
         </Box>
       </Box>
       <ImagePreparationDialog
+        existingFilamentColorCount={bambuExistingColorCount}
         fileName={imagePreparationName}
+        maxFilamentColors={maxImageFilamentColors}
+        nativePaintSlotLimit={MAX_BAMBU_FILAMENT_SLOTS}
         open={isImagePreparationOpen}
         sourceCanvas={imagePreparationCanvas}
         submitting={isApplyingImagePreparation}
@@ -1832,11 +1898,7 @@ function normalizeEditorMode(
     return 'mesh';
   }
 
-  if (
-    mode === 'mesh' ||
-    mode === 'text' ||
-    mode === 'image'
-  ) {
+  if (mode === 'mesh' || mode === 'text' || mode === 'image') {
     return mode;
   }
 
@@ -1858,6 +1920,18 @@ function waitForNextPaint(frames = 1) {
 
     step(frames);
   });
+}
+
+async function fetchSource3mfBlob(path: string): Promise<Blob> {
+  const response = await fetch(normalizeExamplePath(path), {
+    cache: 'no-store',
+  });
+
+  if (!response.ok) {
+    throw new Error('Could not inspect the source 3MF color slots.');
+  }
+
+  return response.blob();
 }
 
 function shouldIgnoreEditorShortcut(event: KeyboardEvent) {

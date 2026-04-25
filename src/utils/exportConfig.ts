@@ -15,6 +15,17 @@
 export const useDynamicExport = false;
 
 /**
+ * Controlled rollout for Graphics/Text overlays.
+ *
+ * Default is ON so the Bambu-native overlay path can be tested from the menu.
+ * Disable temporarily with:
+ *
+ * NEXT_PUBLIC_ENABLE_BAMBU_NATIVE_OVERLAYS=false
+ */
+export const enableBambuNativeOverlayTools =
+  process.env.NEXT_PUBLIC_ENABLE_BAMBU_NATIVE_OVERLAYS !== 'false';
+
+/**
  * Maps each addon option id to the public path of its original .3mf file.
  *
  * These paths should match the files stored under /public/examples/ which

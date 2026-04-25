@@ -4,7 +4,6 @@
 
 'use client';
 
-import CheckCircleRoundedIcon from '@mui/icons-material/CheckCircleRounded';
 import DownloadRoundedIcon from '@mui/icons-material/DownloadRounded';
 import CapstoneIcon from '@mui/icons-material/SportsBaseballRounded';
 import Box from '@mui/material/Box';
@@ -133,9 +132,9 @@ export default function NativeExportModal({
                 lineHeight: 1.65,
               }}
             >
-              This will download the original Bambu Studio–ready .3MF file with
-              all slicer configurations intact — supports, bed layout, and
-              filament assignments are fully preserved.
+              This will download the Bambu Studio–ready .3MF file while
+              preserving native slicer configuration — supports, bed layout,
+              filament assignments, and compatible color metadata.
             </Typography>
 
             <TextField

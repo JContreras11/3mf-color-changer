@@ -1,10 +1,12 @@
 import * as THREE from 'three';
 
 import { Job } from '../components/JobProvider';
+import { collectBambuNativeOverlayPatches } from '../utils/3mf/bambu/collectNativeOverlayPatches';
+import { patchBambu3mfWithNativeOverlayGeometry } from '../utils/3mf/bambu/nativeOverlayGeometryPatcher';
 import { changeColors } from '../utils/3mf/changeColors';
 import exportSceneTo3mf from '../utils/3mf/exportSceneTo3mf';
-import { normalizeExamplePath } from '../utils/examplePaths';
 import ProgressPromise from '../utils/ProgressPromise';
+import { normalizeExamplePath } from '../utils/examplePaths';
 
 export const TYPE = 'exportFile';
 
@@ -44,13 +46,41 @@ export async function generateExportFile(
   const hasProjectedOverlays = hasOverlayMeshes(object);
   let blob: Blob;
 
-  if (sourceFile && !hasProjectedOverlays) {
+  if (sourceFile) {
     try {
-      blob = await changeColors(sourceFile, object);
-    } catch {
+      const nativePreservingBlob = await changeColors(sourceFile, object);
+
+      if (hasProjectedOverlays) {
+        const overlayPatches = collectBambuNativeOverlayPatches(object);
+
+        if (overlayPatches.length === 0) {
+          throw new Error(
+            'This overlay does not include Bambu-compatible geometry metadata. Remove it and place the graphic again before exporting.'
+          );
+        }
+
+        const patchedExport = await patchBambu3mfWithNativeOverlayGeometry(
+          nativePreservingBlob,
+          overlayPatches
+        );
+        blob = patchedExport.blob;
+      } else {
+        blob = nativePreservingBlob;
+      }
+    } catch (error) {
+      if (hasProjectedOverlays) {
+        throw error;
+      }
+
       blob = await exportSceneTo3mf(object, baseName);
     }
   } else {
+    if (hasProjectedOverlays) {
+      throw new Error(
+        'Native overlay export needs the original Bambu 3MF file. Please use a curated cap file or reload the source 3MF before exporting graphics/text.'
+      );
+    }
+
     blob = await exportSceneTo3mf(object, baseName);
   }
 

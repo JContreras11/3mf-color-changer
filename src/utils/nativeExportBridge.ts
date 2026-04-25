@@ -175,7 +175,10 @@ function sanitizeProjectName(name: string): string {
     name
       .trim()
       .replace(/\.3mf$/i, '')
-      .replace(/[<>:"/\\|?*\x00-\x1f]/g, '_')
+      .replace(/[<>:"/\\|?*]/g, '_')
+      .split('')
+      .map((char) => (char.charCodeAt(0) < 32 ? '_' : char))
+      .join('')
       .replace(/\s+/g, ' ')
       .trim() || 'MyProject'
   );

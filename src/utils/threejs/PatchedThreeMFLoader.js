@@ -611,6 +611,7 @@ class ThreeMFLoader extends Loader {
 
 				const triangleProperty = {};
 
+				triangleProperty[ 'triangleIndex' ] = i;
 				triangleProperty[ 'v1' ] = parseInt( v1, 10 );
 				triangleProperty[ 'v2' ] = parseInt( v2, 10 );
 				triangleProperty[ 'v3' ] = parseInt( v3, 10 );
@@ -1123,6 +1124,11 @@ class ThreeMFLoader extends Loader {
 				//
 
 				const mesh = new Mesh( geometry, material );
+				mesh.userData.threeMfSourceTriangleIndices = trianglePropertiesProps.map( function ( triangleProperty ) {
+
+					return triangleProperty.triangleIndex;
+
+				} );
 				meshes.push( mesh );
 
 			}
@@ -1184,6 +1190,11 @@ class ThreeMFLoader extends Loader {
 			// mesh
 
 			const mesh = new Mesh( geometry, material );
+			mesh.userData.threeMfSourceTriangleIndices = triangleProperties.map( function ( triangleProperty ) {
+
+				return triangleProperty.triangleIndex;
+
+			} );
 
 			return mesh;
 
@@ -1251,6 +1262,11 @@ class ThreeMFLoader extends Loader {
 			// mesh
 
 			const mesh = new Mesh( geometry, material );
+			mesh.userData.threeMfSourceTriangleIndices = triangleProperties.map( function ( triangleProperty ) {
+
+				return triangleProperty.triangleIndex;
+
+			} );
 
 			return mesh;
 
@@ -1269,6 +1285,11 @@ class ThreeMFLoader extends Loader {
 			} );
 
 			const mesh = new Mesh( geometry, material );
+			mesh.userData.threeMfSourceTriangleIndices = meshData.triangleProperties.map( function ( triangleProperty ) {
+
+				return triangleProperty.triangleIndex;
+
+			} );
 
 			return mesh;
 
@@ -1327,6 +1348,22 @@ class ThreeMFLoader extends Loader {
 					meshes[ i ].name = objectData.name;
 
 				}
+
+			}
+
+			for ( let i = 0; i < meshes.length; i ++ ) {
+
+				const mesh = meshes[ i ];
+				const sourceTriangleIndices = mesh.userData.threeMfSourceTriangleIndices;
+
+				mesh.userData.threeMf = {
+					modelPath: normalizeModelPath( objectData.modelPath ),
+					objectId: objectData.id,
+					objectName: objectData.name || null,
+					sourceTriangleIndices: sourceTriangleIndices
+				};
+
+				delete mesh.userData.threeMfSourceTriangleIndices;
 
 			}
 

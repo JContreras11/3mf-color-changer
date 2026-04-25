@@ -2,6 +2,7 @@ import AutoFixHighRoundedIcon from '@mui/icons-material/AutoFixHighRounded';
 import BlurOnRoundedIcon from '@mui/icons-material/BlurOnRounded';
 import CloudUploadRoundedIcon from '@mui/icons-material/CloudUploadRounded';
 import DownloadRoundedIcon from '@mui/icons-material/DownloadRounded';
+import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import PaletteRoundedIcon from '@mui/icons-material/PaletteRounded';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
@@ -20,7 +21,10 @@ import {
 } from '../utils/threejs/processImageForFilaments';
 
 type Props = {
+  existingFilamentColorCount?: number;
   fileName: string;
+  maxFilamentColors?: number;
+  nativePaintSlotLimit?: number;
   onCancel: () => void;
   onConfirm: (options: FilamentImageOptions) => void;
   open: boolean;
@@ -29,22 +33,43 @@ type Props = {
 };
 
 export default function ImagePreparationDialog({
+  existingFilamentColorCount = 0,
   fileName,
+  maxFilamentColors = 32,
+  nativePaintSlotLimit = 32,
   onCancel,
   onConfirm,
   open,
   sourceCanvas,
   submitting = false,
 }: Props) {
-  const [options, setOptions] = React.useState<FilamentImageOptions>(
-    getDefaultFilamentImageOptions()
+  const availableNewColorSlots = Math.max(0, Math.floor(maxFilamentColors));
+  const safeMaxFilamentColors = Math.max(1, Math.floor(maxFilamentColors));
+  const wasDefaultReduced =
+    safeMaxFilamentColors < getDefaultFilamentImageOptions().maxColors;
+  const [options, setOptions] = React.useState<FilamentImageOptions>(() =>
+    clampOptionsToColorLimit(
+      getDefaultFilamentImageOptions(),
+      safeMaxFilamentColors
+    )
   );
 
   React.useEffect(() => {
     if (!open) {
-      setOptions(getDefaultFilamentImageOptions());
+      setOptions(
+        clampOptionsToColorLimit(
+          getDefaultFilamentImageOptions(),
+          safeMaxFilamentColors
+        )
+      );
     }
-  }, [open]);
+  }, [open, safeMaxFilamentColors]);
+
+  React.useEffect(() => {
+    setOptions((current) =>
+      clampOptionsToColorLimit(current, safeMaxFilamentColors)
+    );
+  }, [safeMaxFilamentColors]);
 
   const sourcePreview = React.useMemo(() => {
     if (!sourceCanvas) {
@@ -186,25 +211,82 @@ export default function ImagePreparationDialog({
                     Color reducer (filaments)
                   </Typography>
                 </Stack>
-                <ChipLabel value={`${options.maxColors} colors`} />
+                <ChipLabel
+                  value={`${options.maxColors} color${
+                    options.maxColors === 1 ? '' : 's'
+                  }`}
+                />
               </Stack>
               <Slider
                 disabled={submitting}
-                max={24}
-                min={2}
+                max={safeMaxFilamentColors}
+                min={1}
                 step={1}
                 value={options.maxColors}
                 onChange={(_, value) =>
                   setOptions((current) => ({
                     ...current,
-                    maxColors: value as number,
+                    maxColors: Math.min(value as number, safeMaxFilamentColors),
                   }))
                 }
               />
-              <Typography sx={{ color: '#6b7280', fontSize: 13, lineHeight: 1.5 }}>
+              <Typography
+                sx={{ color: '#6b7280', fontSize: 13, lineHeight: 1.5 }}
+              >
                 Use fewer colors to simplify filament swaps and multi-material
                 setups.
               </Typography>
+              <Box
+                sx={{
+                  p: 1.35,
+                  borderRadius: '18px',
+                  bgcolor: wasDefaultReduced
+                    ? alpha('#fff7ed', 0.96)
+                    : alpha('#edf7ff', 0.82),
+                  border: `1px solid ${
+                    wasDefaultReduced
+                      ? alpha('#f59e0b', 0.32)
+                      : alpha('#93c5fd', 0.42)
+                  }`,
+                }}
+              >
+                <Stack direction="row" spacing={1} alignItems="flex-start">
+                  <InfoOutlinedIcon
+                    sx={{
+                      color: wasDefaultReduced ? '#c2410c' : '#0058bc',
+                      fontSize: 18,
+                      mt: 0.15,
+                    }}
+                  />
+                  <Box>
+                    <Typography
+                      sx={{
+                        color: wasDefaultReduced ? '#9a3412' : '#0f3f85',
+                        fontSize: 12,
+                        fontWeight: 800,
+                        letterSpacing: '0.12em',
+                        textTransform: 'uppercase',
+                      }}
+                    >
+                      Bambu color slot budget
+                    </Typography>
+                    <Typography
+                      sx={{
+                        mt: 0.45,
+                        color: '#4b5563',
+                        fontSize: 12.5,
+                        lineHeight: 1.55,
+                      }}
+                    >
+                      {existingFilamentColorCount} of {nativePaintSlotLimit}{' '}
+                      Bambu filament slots are already used by this 3MF.{' '}
+                      {availableNewColorSlots > 0
+                        ? `This graphic is capped at ${availableNewColorSlots} new mapped color${availableNewColorSlots === 1 ? '' : 's'} so export always stays Bambu-compatible.`
+                        : 'No new color slots are available, so this graphic will be reduced and mapped to the nearest existing Bambu color during export.'}
+                    </Typography>
+                  </Box>
+                </Stack>
+              </Box>
             </Stack>
 
             <Stack spacing={1.2}>
@@ -264,9 +346,18 @@ export default function ImagePreparationDialog({
                 border: `1px solid ${alpha('#d8e2ff', 0.74)}`,
               }}
             >
-              <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
-                <AutoFixHighRoundedIcon sx={{ color: '#0058bc', fontSize: 18 }} />
-                <Typography sx={{ color: '#111827', fontSize: 13, fontWeight: 700 }}>
+              <Stack
+                direction="row"
+                spacing={1}
+                alignItems="center"
+                sx={{ mb: 1 }}
+              >
+                <AutoFixHighRoundedIcon
+                  sx={{ color: '#0058bc', fontSize: 18 }}
+                />
+                <Typography
+                  sx={{ color: '#111827', fontSize: 13, fontWeight: 700 }}
+                >
                   Estimated mapped palette
                 </Typography>
               </Stack>
@@ -310,7 +401,11 @@ export default function ImagePreparationDialog({
             spacing={1.4}
             justifyContent="flex-end"
           >
-            <Button disabled={submitting} onClick={onCancel} sx={secondaryButtonSx}>
+            <Button
+              disabled={submitting}
+              onClick={onCancel}
+              sx={secondaryButtonSx}
+            >
               Cancel
             </Button>
             <Button
@@ -326,6 +421,16 @@ export default function ImagePreparationDialog({
       </Stack>
     </Dialog>
   );
+}
+
+function clampOptionsToColorLimit(
+  options: FilamentImageOptions,
+  maxFilamentColors: number
+): FilamentImageOptions {
+  return {
+    ...options,
+    maxColors: Math.max(1, Math.min(options.maxColors, maxFilamentColors)),
+  };
 }
 
 function ChipLabel({ value }: { value: string }) {

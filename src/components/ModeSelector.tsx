@@ -10,6 +10,8 @@ import Typography from '@mui/material/Typography';
 import { alpha } from '@mui/material/styles';
 import React from 'react';
 
+import { enableBambuNativeOverlayTools } from '../utils/exportConfig';
+
 export type Mode =
   | 'mesh'
   | 'text'
@@ -21,10 +23,8 @@ export type DesignPanel =
   | 'objects'
   | 'text';
 
-export const COMING_SOON_PANELS: readonly DesignPanel[] = [
-  'graphics',
-  'text',
-] as const;
+export const COMING_SOON_PANELS: readonly DesignPanel[] =
+  enableBambuNativeOverlayTools ? [] : ['graphics', 'text'];
 
 type Props = {
   activePanel: DesignPanel;
@@ -53,14 +53,14 @@ const panelItems = [
     label: 'Graphics',
     icon: ImageRoundedIcon,
     tooltip: 'Use the quick SVG/PNG library or upload artwork and place it on the cap.',
-    comingSoon: true,
+    comingSoon: !enableBambuNativeOverlayTools,
   },
   {
     id: 'text',
     label: 'Text',
     icon: TextFieldsRoundedIcon,
     tooltip: 'Add editable text to the selected surface.',
-    comingSoon: true,
+    comingSoon: !enableBambuNativeOverlayTools,
   },
 ] as const satisfies readonly {
   comingSoon?: boolean;

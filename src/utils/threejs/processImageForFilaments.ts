@@ -9,6 +9,7 @@ export type FilamentImageResult = {
   palette: string[];
 };
 
+export const MAX_FILAMENT_IMAGE_COLORS = 32;
 const DEFAULT_MAX_COLORS = 8;
 const DEFAULT_BACKGROUND_THRESHOLD = 46;
 const MAX_KMEANS_ITERATIONS = 8;
@@ -234,7 +235,10 @@ function runKmeans(
   height: number,
   maxColors: number
 ): [number, number, number][] {
-  const clampedColors = Math.max(2, Math.min(32, Math.round(maxColors)));
+  const clampedColors = Math.max(
+    1,
+    Math.min(MAX_FILAMENT_IMAGE_COLORS, Math.round(maxColors))
+  );
   const pixels = sampleOpaquePixels(rgbaData, width, height);
 
   if (pixels.length === 0) {
